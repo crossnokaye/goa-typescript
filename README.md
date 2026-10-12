@@ -270,7 +270,7 @@ export const ColorKey = z.enum(["blue", "green"]) satisfies z.ZodType<ColorKey>;
 export type Widget = { color_key: ColorKey; /* ... */ };
 ```
 
-An inline object attribute cannot be named this way (declare a `Type` for it; `goa gen` says so), and a `Default` stays with the parent. Without a name, the usual TypeScript idioms reach an inline type: `Widget["color_key"]` for a required attribute, `NonNullable<Routine["presentation"]>` for an optional one.
+An inline object attribute cannot be named this way (declare a `Type` for it; `goa gen` says so), and a `Default` stays with the parent, which is what makes the attribute optional on the input side. Without a name, the usual TypeScript idioms reach an inline type: `Widget["color_key"]` for a required attribute, `NonNullable<Routine["presentation"]>` for an optional one.
 
 | goa | TypeScript | Notes |
 |---|---|---|
@@ -291,7 +291,7 @@ Things worth knowing:
 
 - **Property names are the wire names.** No case conversion: a `created_at` attribute is `created_at` in TypeScript. `Meta("struct:tag:json", "legacyName")` renames the property, as it renames the JSON key.
 - **Optional means absent.** goa omits unset optional attributes, so types use `name?: T`, never `null`. The one exception goa has is handled for you: a `struct:tag:json` override without `,omitempty` makes goa send `null`, which decodes to absent.
-- **Defaults.** Inside a declared type, an attribute with a `Default` is not optional: decoding fills it in. At the top level of a request it is optional, and omitted from the request, because the server applies the default.
+- **Defaults.** Inside a declared type, an attribute with a `Default` is not optional: decoding fills it in. In a request it is optional, and omitted from the request, because the server applies the default. For that, every declared type with a defaulted attribute, and every type that refers to one, gets an input-side variant beside it, `ThingInput`: the same type and schema with the defaulted attributes optional, referring to `OtherInput` where `Thing` refers to `Other`. Request payloads use the variants, at any depth, so a nested defaulted attribute may be left out too. `ThingInput` is also the type for a value built by hand, such as a fixture or a mock: `encode(ThingInput, value)` sends it as is, and a decoded `Thing` is assignable to it. A type whose input side would not differ has no variant. Results and events keep the decoded type, defaults required. (Migrating from a client that typed defaulted attributes as optional: type the fixtures as `ThingInput` rather than adding the defaults to each of them.) See [ADR 0004](docs/adr/0004-input-side-types.md).
 - **Views.** A result type is one TypeScript type; attributes missing from any of its views are optional.
 - **Recursive types** work (`parent?: Thing`).
 - **Unknown attributes are dropped** when decoding, so a server can add attributes without breaking deployed clients.

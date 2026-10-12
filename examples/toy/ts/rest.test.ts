@@ -6,6 +6,7 @@ import {
   type Middleware,
   RequestValidationError,
   type Thing,
+  type ThingInput,
   type ThingReply,
   type ThingSummary,
   type ThingWithViews,
@@ -176,6 +177,36 @@ describe("create_thing: a JSON body, a 201 and custom errors", () => {
     const result = await toy.createThing(client({ middleware: [seen.middleware] }), { name: "x", kind: "gizmo" as "widget" });
     expect(result.error).toBeInstanceOf(RequestValidationError);
     expect(seen.requests).toHaveLength(0);
+  });
+});
+
+describe("echo_thing: a declared type with defaults nested in the request", () => {
+  const id = "11111111-1111-4111-8111-111111111111";
+
+  it("takes the input side of the type, so the defaulted attributes may be omitted", () => {
+    expectTypeOf<toy.EchoThingPayload>().toEqualTypeOf<{ thing: ThingInput }>();
+    expectTypeOf<toy.EchoThingPayload["thing"]["kind"]>().toEqualTypeOf<"widget" | "gadget" | undefined>();
+  });
+
+  it("leaves an omitted attribute off the wire and gets it back with the server's default", async () => {
+    const seen = spy();
+    // tags is sent because goa's server validates its MinLength even when it is absent. The
+    // nested value overrides kind rather than enabled: goa's server resets a nested false to
+    // its default of true when encoding the response.
+    const sent: ThingInput = { id, name: "echoed", tags: ["t"], parent: { id, kind: "gadget", tags: ["t"] } };
+    const result = await toy.echoThing(client({ middleware: [seen.middleware] }), { thing: sent });
+    expect(await seen.requests[0]!.json()).toEqual({ thing: sent });
+    const thing = unwrap(result);
+    expectTypeOf(thing).toEqualTypeOf<Thing>();
+    // The server applied the defaults, at both levels; the decoded value has them required.
+    expect(thing).toEqual({
+      id,
+      name: "echoed",
+      kind: "widget",
+      enabled: true,
+      tags: ["t"],
+      parent: { id, kind: "gadget", enabled: true, tags: ["t"] },
+    });
   });
 });
 

@@ -44,6 +44,9 @@ func TestBuildNamedAttrs(t *testing.T) {
 	wantEqual(t, "enum description", enum.Description, "The key of the widget's color.")
 	wantEqual(t, "enum ts", enum.TSDef, `"blue" | "green"`)
 	wantEqual(t, "enum zod", enum.Zod, `z.enum(["blue", "green"])`)
+	if enum.Input != nil {
+		t.Errorf("an enum has no input-side variant, got %+v", enum.Input)
+	}
 
 	// The declaration carries the validations; the parent applies the default.
 	wantEqual(t, "priority zod", typeSpec(t, pkg, "Priority").Zod, "z.int().gte(1).lte(5)")
@@ -64,6 +67,8 @@ func TestBuildNamedAttrs(t *testing.T) {
 	widgets := typeSpec(t, pkg, "Widgets")
 	wantEqual(t, "widgets recursive", widgets.Recursive, true)
 	wantEqual(t, "widgets ts", widgets.TSDef, "Widget[]")
+	wantEqual(t, "widgets input", widgets.Input.TSDef, "WidgetInput[]")
+	wantContains(t, "widget input", widget.Input.TSDef, "priority?: Priority | undefined;", "children?: WidgetsInput | undefined;")
 
 	wantEqual(t, "warnings", pkg.Warnings, []string{
 		`Meta("typescript:name", "Position") on attribute "position" is ignored: an inline object attribute cannot be named; declare a Type instead`,
@@ -75,6 +80,66 @@ func TestBuildNamedAttrs(t *testing.T) {
 	req := endpoint(t, service(t, pkg, "svc"), "create").Request
 	wantContains(t, "request", req.TSDef, "view?: View | undefined;", "cursor?: string | undefined;")
 	wantContains(t, "request schema", req.Zod, "view: View.optional(),", "cursor: z.string().optional(),")
-	wantEqual(t, "imports", endpoint(t, service(t, pkg, "svc"), "create").Imports.Types, []string{"View", "Widget"})
+	// The request uses the input side of Widget; the result, Widget itself.
+	wantEqual(t, "imports", endpoint(t, service(t, pkg, "svc"), "create").Imports.Types, []string{"View", "Widget", "WidgetInput"})
 	wantEqual(t, "cursor", typeSpec(t, pkg, "Cursor").TSDef, "Uint8Array")
+}
+
+func TestBuildInputs(t *testing.T) {
+	pkg := build(t, testdata.InputsDSL)
+	inputs := map[string]string{}
+	for _, ts := range pkg.Types {
+		if ts.Input != nil {
+			inputs[ts.Name] = ts.Input.Name
+		}
+	}
+	// Only a type with a defaulted attribute, or one that refers to such a
+	// type, has a variant; its name yields to a declared type.
+	wantEqual(t, "inputs", inputs, map[string]string{
+		"Snapshot": "SnapshotInput2", "Node": "NodeInput", "Report": "ReportInput", "Snapshots": "SnapshotsInput",
+	})
+
+	snapshot := typeSpec(t, pkg, "Snapshot")
+	wantContains(t, "snapshot", snapshot.TSDef, "pending: boolean;")
+	wantContains(t, "snapshot schema", snapshot.Zod, "pending: z.boolean().default(false),")
+	wantContains(t, "snapshot input", snapshot.Input.TSDef,
+		"Default: false (applied by the server when omitted).", "pending?: boolean | undefined;", "taken_at: Date;")
+	wantContains(t, "snapshot input schema", snapshot.Input.Zod, "pending: z.boolean().optional(),", "taken_at: dateTime(),")
+	wantEqual(t, "snapshot input kind", snapshot.Input.Kind, TypeObject)
+
+	// A nested reference, an array and a map use the variant; a type without
+	// one is referred to as is.
+	report := typeSpec(t, pkg, "Report")
+	wantContains(t, "report", report.TSDef, "latest: Snapshot;", "history?: Snapshot[] | undefined;")
+	wantContains(t, "report input", report.Input.TSDef,
+		"latest: SnapshotInput2;", "history?: SnapshotInput2[] | undefined;",
+		"by_name?: Record<string, SnapshotInput2> | undefined;", "plain?: Plain | undefined;")
+	wantContains(t, "report input schema", report.Input.Zod,
+		"latest: SnapshotInput2,", "history: z.array(SnapshotInput2).optional(),",
+		"by_name: z.record(z.string(), SnapshotInput2).optional(),", "plain: Plain.optional(),")
+
+	// A recursive type refers to its own variant, lazily.
+	node := typeSpec(t, pkg, "Node")
+	wantEqual(t, "node recursive", node.Input.Recursive, true)
+	wantContains(t, "node input", node.Input.TSDef, "weight?: number | undefined;", "children?: NodeInput[] | undefined;")
+	wantContains(t, "node input schema", node.Input.Zod, "children: z.array(NodeInput).optional(),")
+
+	// A named array of such a type.
+	wantEqual(t, "snapshots input", typeSpec(t, pkg, "Snapshots").Input.TSDef, "SnapshotInput2[]")
+
+	// Request payloads use the variants, at the top level and inside inline
+	// objects; the result keeps the decoded type.
+	svc := service(t, pkg, "svc")
+	submit := endpoint(t, svc, "submit")
+	wantContains(t, "submit request", submit.Request.TSDef,
+		"report: ReportInput;", "note?: string | undefined;", "flag?: boolean | undefined;",
+		"named?: SnapshotInput | undefined;", "all?: SnapshotsInput | undefined;")
+	wantContains(t, "submit request schema", submit.Request.Zod,
+		"report: ReportInput,", "note: z.string().optional(),", "flag: z.boolean().optional(),")
+	wantEqual(t, "submit imports", submit.Imports.Types, []string{"Plain", "Report", "ReportInput", "SnapshotInput", "SnapshotsInput"})
+	wantEqual(t, "submit result", submit.Result.TypeName, "Report")
+
+	node2 := endpoint(t, svc, "submit_node")
+	wantContains(t, "submit_node request", node2.Request.TSDef, "weight?: number | undefined;", "children?: NodeInput[] | undefined;")
+	wantEqual(t, "submit_node result", node2.Result.TypeName, "Node")
 }

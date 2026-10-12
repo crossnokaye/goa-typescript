@@ -14,3 +14,19 @@ export const Filter = z.object({
   since: dateTime().optional(),
   limit: z.int().default(10),
 }) satisfies z.ZodType<Filter>;
+
+/**
+ * FilterInput is Filter as a caller builds it.
+ * An attribute with a default may be left out: the server fills it in.
+ */
+export type FilterInput = {
+  kinds?: ("widget" | "gadget")[] | undefined;
+  since?: Date | undefined;
+  /** Default: 10 (applied by the server when omitted). */
+  limit?: number | undefined;
+};
+export const FilterInput = z.object({
+  kinds: z.array(z.enum(["widget", "gadget"])).optional(),
+  since: dateTime().optional(),
+  limit: z.int().optional(),
+}) satisfies z.ZodType<FilterInput>;

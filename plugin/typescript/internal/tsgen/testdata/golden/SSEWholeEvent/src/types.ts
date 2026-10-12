@@ -14,3 +14,19 @@ export const Event = z.object({
   id: z.string(),
   at: dateTime().optional(),
 }) satisfies z.ZodType<Event>;
+
+/**
+ * EventInput is Event as a caller builds it.
+ * An attribute with a default may be left out: the server fills it in.
+ */
+export type EventInput = {
+  /** Default: "thing" (applied by the server when omitted). */
+  type?: string | undefined;
+  id: string;
+  at?: Date | undefined;
+};
+export const EventInput = z.object({
+  type: z.string().optional(),
+  id: z.string(),
+  at: dateTime().optional(),
+}) satisfies z.ZodType<EventInput>;

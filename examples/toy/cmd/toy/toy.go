@@ -220,6 +220,12 @@ func (s *toyService) CreateThing(_ context.Context, p *toy.CreateThingPayload) (
 	return thing, nil
 }
 
+func (s *toyService) EchoThing(_ context.Context, p *toy.EchoThingPayload) (*types.Thing, error) {
+	// goa's request decoder has already filled in the defaults of the nested
+	// thing (kind, enabled): what comes back is what the server saw.
+	return p.Thing, nil
+}
+
 func (s *toyService) UpsertThing(_ context.Context, p *toy.UpsertThingPayload) (*toy.UpsertResult, error) {
 	thing := minimalThing(minimalThingID)
 	thing.Name = ptr(p.Name)

@@ -1290,3 +1290,67 @@ var NamedAttrsDSL = func() {
 		})
 	})
 }
+
+// InputsDSL covers the input-side variants of declared types: emitted for a
+// type with a defaulted attribute and for the types that refer to one, and
+// used by request payloads.
+var InputsDSL = func() {
+	var Plain = Type("Plain", func() {
+		Description("No default anywhere: no input-side variant.")
+		Attribute("id", String)
+		Required("id")
+	})
+	var Snapshot = Type("Snapshot", func() {
+		Attribute("pending", Boolean, func() { Default(false) })
+		Attribute("taken_at", String, func() { Format(FormatDateTime) })
+		Required("taken_at")
+	})
+	var Node = Type("Node", func() {
+		Description("Recursive, with a default.")
+		Attribute("name", String)
+		Attribute("weight", Int, func() { Default(1) })
+		Attribute("children", ArrayOf("Node"))
+		Attribute("plain", Plain)
+		Required("name")
+	})
+	var Report = Type("Report", func() {
+		Description("No default of its own: differs through Snapshot.")
+		Attribute("title", String)
+		Attribute("latest", Snapshot)
+		Attribute("history", ArrayOf(Snapshot))
+		Attribute("by_name", MapOf(String, Snapshot))
+		Attribute("plain", Plain)
+		Required("title", "latest")
+	})
+	var Snapshots = Type("Snapshots", ArrayOf(Snapshot))
+	var SnapshotInput = Type("SnapshotInput", func() {
+		Description("Collides with the input-side variant of Snapshot.")
+		Attribute("x", String)
+	})
+	Service("svc", func() {
+		Method("submit", func() {
+			Payload(func() {
+				Attribute("report", Report)
+				Attribute("note", String, func() { Default("none") })
+				Attribute("extra", func() {
+					Attribute("flag", Boolean, func() { Default(true) })
+					Attribute("plain", Plain)
+				})
+				Attribute("named", SnapshotInput)
+				Attribute("all", Snapshots)
+				Required("report")
+			})
+			Result(Report)
+			HTTP(func() {
+				POST("/reports")
+			})
+		})
+		Method("submit_node", func() {
+			Payload(Node)
+			Result(Node)
+			HTTP(func() {
+				POST("/nodes")
+			})
+		})
+	})
+}

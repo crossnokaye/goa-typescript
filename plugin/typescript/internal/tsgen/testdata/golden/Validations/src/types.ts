@@ -32,3 +32,41 @@ export const Validated = z.object({
   tags: z.array(z.string()).min(1).max(5).default(["new"]),
   limits: z.record(z.string(), z.int()).refine((m) => Object.keys(m).length >= 1, { message: "must have at least 1 entries" }).refine((m) => Object.keys(m).length <= 3, { message: "must have at most 3 entries" }).optional(),
 }) satisfies z.ZodType<Validated>;
+
+/**
+ * ValidatedInput is Validated as a caller builds it.
+ * An attribute with a default may be left out: the server fills it in.
+ */
+export type ValidatedInput = {
+  /** Default: "widget" (applied by the server when omitted). */
+  kind?: "widget" | "gadget" | undefined;
+  priority?: 1 | 2 | 3 | undefined;
+  /** Default: true (applied by the server when omitted). */
+  enabled?: boolean | undefined;
+  name: string;
+  re2_only?: string | undefined;
+  count?: number | undefined;
+  ratio?: number | undefined;
+  exclusive?: number | undefined;
+  /** Default: 3 (applied by the server when omitted). */
+  retries?: number | undefined;
+  /** Default: new Date("2026-01-01T00:00:00Z") (applied by the server when omitted). */
+  since?: Date | undefined;
+  /** Default: ["new"] (applied by the server when omitted). */
+  tags?: string[] | undefined;
+  limits?: Record<string, number> | undefined;
+};
+export const ValidatedInput = z.object({
+  kind: z.enum(["widget", "gadget"]).optional(),
+  priority: z.literal([1, 2, 3]).optional(),
+  enabled: z.boolean().optional(),
+  name: z.string().min(1).max(64).regex(new RegExp("^[a-z][a-z0-9-]*$")),
+  re2_only: z.string().optional(), // pattern not enforced (RE2-only syntax): ^(?i)[a-z]+\z
+  count: z.int().gte(0).optional(),
+  ratio: z.number().gte(0).lte(1).optional(),
+  exclusive: z.number().gt(0).lt(100).optional(),
+  retries: z.int().min(0).lte(10).optional(),
+  since: dateTime().optional(),
+  tags: z.array(z.string()).min(1).max(5).optional(),
+  limits: z.record(z.string(), z.int()).refine((m) => Object.keys(m).length >= 1, { message: "must have at least 1 entries" }).refine((m) => Object.keys(m).length <= 3, { message: "must have at most 3 entries" }).optional(),
+}) satisfies z.ZodType<ValidatedInput>;

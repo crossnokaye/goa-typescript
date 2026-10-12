@@ -7,6 +7,7 @@ import {
   ThingEvent,
   ThingEventEnvelope,
   ThingFilter,
+  ThingInput,
   ThingKind,
   toy,
   unwrap,
@@ -82,6 +83,31 @@ describe("ThingKind: an inline enum named with Meta(\"typescript:name\")", () =>
     // The default belongs to the parent, not to the enum.
     expect(decode(ThingKind, undefined).ok).toBe(false);
     expect(unwrap(decode(Thing, { id })).kind).toBe("widget");
+  });
+});
+
+describe("ThingInput: the input side of a type with defaults", () => {
+  it("makes the defaulted attributes optional and nothing else", () => {
+    expectTypeOf<ThingInput["kind"]>().toEqualTypeOf<ThingKind | undefined>();
+    expectTypeOf<ThingInput["enabled"]>().toEqualTypeOf<boolean | undefined>();
+    expectTypeOf<ThingInput["id"]>().toEqualTypeOf<string>();
+    // Nested references use the input side too.
+    expectTypeOf<ThingInput["parent"]>().toEqualTypeOf<ThingInput | undefined>();
+    expectTypeOf<ThingEvent["thing"]>().toEqualTypeOf<Thing | undefined>();
+    expectTypeOf<z.output<typeof ThingInput>>().toEqualTypeOf<ThingInput>();
+  });
+
+  it("encodes a hand-built value without inventing the defaults", () => {
+    const fixture: ThingInput = { id, name: "fixture", parent: { id } };
+    expect(unwrap(encode(ThingInput, fixture))).toEqual({ id, name: "fixture", parent: { id } });
+    expect(unwrap(decode(ThingInput, { id }))).toEqual({ id });
+    // A decoded Thing is a ThingInput; the reverse needs the defaults.
+    const thing: Thing = unwrap(decode(Thing, { id }));
+    const asInput: ThingInput = thing;
+    expect(asInput.kind).toBe("widget");
+    // @ts-expect-error kind and enabled are required once decoded
+    const back: Thing = fixture;
+    expect(back).toBe(fixture);
   });
 });
 

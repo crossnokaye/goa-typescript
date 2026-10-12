@@ -47,6 +47,9 @@ type typeMapper struct {
 	// named holds every attribute whose Meta("typescript:name") has been
 	// considered, hoisted or not.
 	named map[*expr.AttributeExpr]struct{}
+	// inputs maps the declarations whose input-side variant differs from the
+	// declaration to the variant's identifier.
+	inputs map[decl]string
 	// warnings are remarks about metadata the mapper cannot honour.
 	warnings []string
 }
@@ -59,6 +62,7 @@ func newTypeMapper(roots ...*expr.RootExpr) *typeMapper {
 		authored:  make(map[expr.UserType]struct{}),
 		attrs:     make(map[*expr.AttributeExpr]decl),
 		named:     make(map[*expr.AttributeExpr]struct{}),
+		inputs:    make(map[decl]string),
 	}
 	for _, root := range roots {
 		if root == nil {
@@ -345,6 +349,58 @@ func (m *typeMapper) directRefs(d decl) []decl {
 	return out
 }
 
+// hasInlineDefault reports whether an object attribute rendered as part of d
+// has a default value. Such an attribute is required once decoded and
+// optional when sent, so the input side of d differs from d.
+func (m *typeMapper) hasInlineDefault(d decl) bool {
+	found := false
+	m.walkInline(d, func(a *expr.AttributeExpr) {
+		obj, ok := a.Type.(*expr.Object)
+		if !ok {
+			return
+		}
+		for _, nat := range *obj {
+			if nat.Attribute.DefaultValue != nil {
+				found = true
+			}
+		}
+	}, func(decl) {})
+	return found
+}
+
+// markInputs decides which declarations get an input-side variant: those with
+// a defaulted attribute, and those that refer to one, directly or not. The
+// variants are named after their declarations, in name order.
+func (m *typeMapper) markInputs(scope *codegen.NameScope) {
+	edges := make(map[decl][]decl, len(m.origins))
+	differs := make(map[decl]bool, len(m.origins))
+	for _, d := range m.origins {
+		edges[d] = m.directRefs(d)
+		differs[d] = m.hasInlineDefault(d)
+	}
+	for changed := true; changed; {
+		changed = false
+		for _, d := range m.origins {
+			if differs[d] {
+				continue
+			}
+			for _, dep := range edges[d] {
+				if differs[dep] {
+					differs[d], changed = true, true
+					break
+				}
+			}
+		}
+	}
+	sorted := append([]decl(nil), m.origins...)
+	sort.SliceStable(sorted, func(i, j int) bool { return m.names[sorted[i]] < m.names[sorted[j]] })
+	for _, d := range sorted {
+		if differs[d] {
+			m.inputs[d] = scope.Unique(m.names[d] + "Input")
+		}
+	}
+}
+
 // order returns the hoisted declarations so that every one follows the ones
 // its schema refers to: strongly connected components in topological order,
 // ties broken by name. Members of a cycle are flagged recursive.
@@ -451,7 +507,8 @@ func (m *typeMapper) order() []decl {
 	return out
 }
 
-// typeSpec renders the declaration of one hoisted type.
+// typeSpec renders the declaration of one hoisted type, and its input-side
+// variant when that differs.
 func (m *typeMapper) typeSpec(d decl, r *refs) *TypeSpec {
 	att := d.attribute()
 	spec := &TypeSpec{
@@ -461,7 +518,19 @@ func (m *typeMapper) typeSpec(d decl, r *refs) *TypeSpec {
 		Kind:        TypeAlias,
 		Recursive:   m.recursive[d],
 	}
+	if name, ok := m.inputs[d]; ok {
+		spec.Input = &TypeSpec{
+			GoaName:   spec.GoaName,
+			Name:      name,
+			Kind:      TypeAlias,
+			Recursive: spec.Recursive,
+			Description: fmt.Sprintf(
+				"%s is %s as a caller builds it.\nAn attribute with a default may be left out: the server fills it in.",
+				name, spec.Name),
+		}
+	}
 	c := &renderCtx{m: m, refs: r}
+	ci := &renderCtx{m: m, refs: r, input: true}
 	zodIndent := ""
 	if spec.Recursive {
 		zodIndent = "  "
@@ -484,6 +553,12 @@ func (m *typeMapper) typeSpec(d decl, r *refs) *TypeSpec {
 				Optional:    f.optional,
 			})
 		}
+		if in := spec.Input; in != nil {
+			in.Kind = TypeObject
+			fields := ci.fields(att, obj, opts)
+			in.TSDef = ci.objectTS(fields, "")
+			in.Zod, _ = ci.objectZod(fields, zodIndent)
+		}
 		return spec
 	}
 	// A named primitive, array, map, union or reference to another type. The
@@ -494,6 +569,11 @@ func (m *typeMapper) typeSpec(d decl, r *refs) *TypeSpec {
 	spec.TSDef = c.tsType(inner, "", false)
 	z := c.zod(inner, zodIndent, false)
 	spec.Zod, spec.ZodNote = z.code, z.note()
+	if in := spec.Input; in != nil {
+		in.TSDef = ci.tsType(inner, "", false)
+		z := ci.zod(inner, zodIndent, false)
+		in.Zod, in.ZodNote = z.code, z.note()
+	}
 	return spec
 }
 
@@ -501,6 +581,10 @@ func (m *typeMapper) typeSpec(d decl, r *refs) *TypeSpec {
 type renderCtx struct {
 	m    *typeMapper
 	refs *refs
+	// input renders the input side of a value, the one a caller builds: an
+	// attribute with a default is optional, wherever it sits, and a hoisted
+	// type is referred to by its input-side variant when it has one.
+	input bool
 	// inlining holds the unnamed user types being rendered, to stop on a
 	// reference cycle that no named type breaks.
 	inlining map[expr.UserType]struct{}
@@ -509,6 +593,11 @@ type renderCtx struct {
 // ref renders a reference to a hoisted declaration and records the import.
 func (c *renderCtx) ref(d decl) string {
 	name := c.m.names[d]
+	if c.input {
+		if in, ok := c.m.inputs[d]; ok {
+			name = in
+		}
+	}
 	c.refs.types[name] = struct{}{}
 	return name
 }
@@ -615,13 +704,15 @@ func (c *renderCtx) fields(parent *expr.AttributeExpr, obj *expr.Object, opts ob
 		f := field{name: nat.Name, key: wk.Key, att: nat.Attribute, param: param}
 		required := parent.IsRequired(nat.Name)
 		def, hasDefault := defaultLiteral(nat.Attribute)
+		hidden := opts.views != nil && !inEveryView(opts.views, nat.Name)
 		switch {
-		case opts.request:
-			f.optional = !required || nat.Attribute.DefaultValue != nil
+		case opts.request || c.input:
+			// The caller builds the value: the server fills in a default.
+			f.optional = !required || hidden || nat.Attribute.DefaultValue != nil
 			if hasDefault {
 				f.serverDefault = def
 			}
-		case opts.views != nil && !inEveryView(opts.views, nat.Name):
+		case hidden:
 			f.optional = true
 		case hasDefault:
 			f.def = def

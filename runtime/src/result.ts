@@ -31,15 +31,25 @@ export function err<E>(error: E): Result<never, E> {
   return { ok: false, error };
 }
 
+/**
+ * OkValue is the success value type of any Result-shaped type.
+ *
+ * `unwrap` reads its value type from the success arm alone rather than from
+ * `Result<T, E>`. Inferring `T` structurally from a `CallResult` would also
+ * visit the failure arm, whose `value?: never` admits `undefined` when the
+ * caller compiles without `exactOptionalPropertyTypes`, and yield `T | undefined`.
+ */
+type OkValue<R> = R extends { ok: true; value: infer T } ? T : never;
+
 /** unwrap returns the success value or throws the error. */
-export function unwrap<T, E>(result: Result<T, E>): T {
+export function unwrap<R extends Result<unknown, unknown>>(result: R): OkValue<R> {
   if (!result.ok) {
     throw result.error;
   }
-  return result.value;
+  return result.value as OkValue<R>;
 }
 
 /** unwrapAsync awaits a Result and returns the success value or throws the error. */
-export async function unwrapAsync<T, E>(result: Promise<Result<T, E>>): Promise<T> {
+export async function unwrapAsync<R extends Result<unknown, unknown>>(result: Promise<R>): Promise<OkValue<R>> {
   return unwrap(await result);
 }

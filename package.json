@@ -1,0 +1,9 @@
+{
+  "name": "goa-typescript",
+  "private": true,
+  "packageManager": "pnpm@10.34.5",
+  "scripts": {
+    "test": "pnpm -r test",
+    "type-check": "pnpm -r type-check"
+  }
+}

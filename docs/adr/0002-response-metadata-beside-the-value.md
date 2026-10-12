@@ -58,6 +58,5 @@ Goa already has an answer for most metadata. A design maps a response header ont
 
 ## References
 
-- `docs/plan-rest.md`, "Decisions".
 - `runtime/src/result.ts` (`CallResult`), `runtime/src/schema.ts` (`decodeResponse`).
 - ADR 0001, "Functional only" and "Typed Goa errors".

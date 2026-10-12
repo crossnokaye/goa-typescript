@@ -27,16 +27,16 @@ export interface ClientOptions {
    * auth supplies credentials: one provider used for every security scheme,
    * or a provider per scheme name as declared in the design.
    */
-  auth?: TokenProvider | Record<string, TokenProvider>;
+  auth?: TokenProvider | Record<string, TokenProvider> | undefined;
   /** fetch replaces the global fetch. */
-  fetch?: typeof fetch;
+  fetch?: typeof fetch | undefined;
   /** middleware wraps every request; the first entry is outermost. */
-  middleware?: readonly Middleware[];
+  middleware?: readonly Middleware[] | undefined;
   /** headers are sent with every request. */
-  headers?: HeadersInit;
-  credentials?: RequestCredentials;
+  headers?: HeadersInit | undefined;
+  credentials?: RequestCredentials | undefined;
   /** timeoutMs bounds the wait for response headers. Streams are not cut off once they start. */
-  timeoutMs?: number;
+  timeoutMs?: number | undefined;
 }
 
 /** Client carries the configuration shared by every generated function. */
@@ -52,17 +52,17 @@ export function createClient(options: ClientOptions): Client {
 /** RequestOptions tune a single call. Unlisted `RequestInit` fields pass through to fetch. */
 export interface RequestOptions
   extends Omit<RequestInit, "method" | "body" | "headers" | "signal"> {
-  signal?: AbortSignal;
+  signal?: AbortSignal | undefined;
   /** headers are merged over the client's headers and the endpoint's own. */
-  headers?: HeadersInit;
-  timeoutMs?: number;
-  baseURL?: string;
+  headers?: HeadersInit | undefined;
+  timeoutMs?: number | undefined;
+  baseURL?: string | undefined;
 }
 
 /** StreamOptions tune a single streaming call. */
 export interface StreamOptions extends RequestOptions {
   /** lastEventId resumes a stream: it is sent as the `Last-Event-ID` header. */
-  lastEventId?: string;
+  lastEventId?: string | undefined;
 }
 
 /** EndpointBody says which part of the encoded request becomes the JSON body. */
@@ -83,8 +83,8 @@ export interface EndpointSpec {
   /** headerParams maps request properties to header names. */
   headerParams: Readonly<Record<string, string>>;
   /** mapQuery names the request property whose entries spread into the query string ("" = the whole request). */
-  mapQuery?: string;
-  body?: EndpointBody;
+  mapQuery?: string | undefined;
+  body?: EndpointBody | undefined;
   accept: string;
   security: readonly SecurityScheme[];
 }

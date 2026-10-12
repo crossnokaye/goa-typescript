@@ -60,9 +60,10 @@ export type HeadPageError =
  */
 export async function headPage(
   client: Client,
+  payload?: undefined,
   options?: RequestOptions,
 ): Promise<CallResult<HeadPageResult, HeadPageError>> {
-  const sent = await send(client, headPageSpec, undefined, options);
+  const sent = await send(client, headPageSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

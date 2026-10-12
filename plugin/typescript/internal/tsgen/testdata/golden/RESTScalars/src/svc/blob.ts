@@ -45,9 +45,10 @@ export type BlobError =
 /** GET /blob */
 export async function blob(
   client: Client,
+  payload?: undefined,
   options?: RequestOptions,
 ): Promise<CallResult<BlobResult, BlobError>> {
-  const sent = await send(client, blobSpec, undefined, options);
+  const sent = await send(client, blobSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

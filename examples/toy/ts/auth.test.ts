@@ -35,7 +35,7 @@ describe("JWT security", () => {
   it("keeps the token out of the request type", () => {
     expectTypeOf<toy.StreamThingsSsePayload>().toEqualTypeOf<{ id: string; delay_ms?: number | undefined }>();
     expectTypeOf(toy.streamTextSse).parameters.toEqualTypeOf<
-      [client: ReturnType<typeof createClient>, options?: Parameters<typeof toy.streamTextSse>[1]]
+      [client: ReturnType<typeof createClient>, payload?: undefined, options?: Parameters<typeof toy.streamTextSse>[2]]
     >();
   });
 
@@ -76,7 +76,7 @@ describe("JWT security", () => {
   it("selects the provider by scheme name", async () => {
     const authed = client({ auth: { jwt: token, api_key: "wrong" } });
     expect((await toy.streamCountSse(authed)).ok).toBe(true);
-    expect((await toy.streamKeyedSse(authed, {})).error).toMatchObject({ name: "unauthorized" });
+    expect((await toy.streamKeyedSse(authed)).error).toMatchObject({ name: "unauthorized" });
   });
 });
 
@@ -93,7 +93,7 @@ describe("API key security", () => {
   it("sends the key in the query string", async () => {
     const seen = spy();
     const authed = client({ auth: { api_key: token }, middleware: [seen.middleware] });
-    const events = await collect(await unwrapAsync(toy.streamKeyedSse(authed, {})));
+    const events = await collect(await unwrapAsync(toy.streamKeyedSse(authed)));
     expect(events.map((e) => e.id)).toEqual(["keyed-1"]);
     expect(seen.urls).toEqual([`${baseURL}/keyed?key=${token}`]);
     expect(seen.authorization).toEqual([null]);

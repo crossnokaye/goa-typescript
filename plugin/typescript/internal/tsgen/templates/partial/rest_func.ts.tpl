@@ -2,7 +2,9 @@
 export async function {{ .FuncName }}(
   client: Client,
 {{- if .Request }}
-  payload: {{ .Request.TypeName }},
+  payload{{ if .Request.Optional }}?{{ end }}: {{ .Request.TypeName }},
+{{- else }}
+  payload{{ if not .RawBody }}?{{ end }}: undefined,
 {{- end }}
 {{- if .RawBody }}
   body: BodyInit,
@@ -10,13 +12,13 @@ export async function {{ .FuncName }}(
   options?: RequestOptions,
 ): Promise<CallResult<{{ .ResultTS }}, {{ .ErrorTypeName }}>> {
 {{- if .Request }}
-  const wire = encode({{ .Request.TypeName }}, payload);
+  const wire = encode({{ .Request.TypeName }}, payload{{ if .Request.Optional }} ?? {}{{ end }});
   if (!wire.ok) {
     return wire;
   }
   const sent = await send(client, {{ .SpecName }}, wire.value, options{{ if .RawBody }}, body{{ end }});
 {{- else }}
-  const sent = await send(client, {{ .SpecName }}, undefined, options{{ if .RawBody }}, body{{ end }});
+  const sent = await send(client, {{ .SpecName }}, payload, options{{ if .RawBody }}, body{{ end }});
 {{- end }}
   if (!sent.ok) {
     return sent;

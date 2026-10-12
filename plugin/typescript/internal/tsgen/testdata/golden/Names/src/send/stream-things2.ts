@@ -47,9 +47,10 @@ export type StreamThings2Error =
  */
 export async function streamThings2(
   client: Client,
+  payload?: undefined,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<StreamThings2Event>, StreamThings2Error>> {
-  const sent = await send(client, streamThings2Spec, undefined, options);
+  const sent = await send(client, streamThings2Spec, payload, options);
   if (!sent.ok) {
     return sent;
   }

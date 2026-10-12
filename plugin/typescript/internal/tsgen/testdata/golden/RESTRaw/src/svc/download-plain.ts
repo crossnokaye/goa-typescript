@@ -45,9 +45,10 @@ export type DownloadPlainError =
  */
 export async function downloadPlain(
   client: Client,
+  payload?: undefined,
   options?: RequestOptions,
 ): Promise<CallResult<void, DownloadPlainError>> {
-  const sent = await send(client, downloadPlainSpec, undefined, options);
+  const sent = await send(client, downloadPlainSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

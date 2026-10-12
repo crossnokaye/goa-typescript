@@ -47,9 +47,10 @@ export type StreamCountError =
  */
 export async function streamCount(
   client: Client,
+  payload?: undefined,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<StreamCountEvent>, StreamCountError>> {
-  const sent = await send(client, streamCountSpec, undefined, options);
+  const sent = await send(client, streamCountSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

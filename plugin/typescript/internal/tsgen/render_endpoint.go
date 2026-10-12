@@ -79,6 +79,10 @@ func restDoc(ep *EndpointSpec) string {
 	if ep.RawBody {
 		note("`body` is sent as the request body, as is. A `ReadableStream` does not work in",
 			"every browser; a `Blob`, an `ArrayBuffer`, `FormData` or a string does.")
+		if ep.Request == nil {
+			note("The method has no payload: pass `undefined` as `payload`, which keeps `body` in",
+				"the place every function has it.")
+		}
 	}
 	if len(ep.Responses) > 1 {
 		parts := make([]string, len(ep.Responses))

@@ -47,9 +47,10 @@ export type StreamTextError =
  */
 export async function streamText(
   client: Client,
+  payload?: undefined,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<StreamTextEvent>, StreamTextError>> {
-  const sent = await send(client, streamTextSpec, undefined, options);
+  const sent = await send(client, streamTextSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

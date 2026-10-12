@@ -58,9 +58,10 @@ export type FindDiagramError =
  */
 export async function findDiagram(
   client: Client,
+  payload?: undefined,
   options?: RequestOptions,
 ): Promise<CallResult<FindDiagramResult, FindDiagramError>> {
-  const sent = await send(client, findDiagramSpec, undefined, options);
+  const sent = await send(client, findDiagramSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

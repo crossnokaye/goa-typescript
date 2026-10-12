@@ -1153,6 +1153,18 @@ var RESTRawDSL = func() {
 				Response(StatusNoContent)
 			})
 		})
+		Method("upload_tagged", func() {
+			Description("Every payload attribute is optional, but the body follows it.")
+			Payload(func() {
+				Attribute("tag", String)
+			})
+			HTTP(func() {
+				POST("/tagged")
+				Header("tag:X-Tag")
+				SkipRequestBodyEncodeDecode()
+				Response(StatusNoContent)
+			})
+		})
 	})
 }
 

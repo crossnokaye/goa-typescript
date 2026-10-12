@@ -48,9 +48,10 @@ export type StreamBlobError =
  */
 export async function streamBlob(
   client: Client,
+  payload?: undefined,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<StreamBlobEvent>, StreamBlobError>> {
-  const sent = await send(client, streamBlobSpec, undefined, options);
+  const sent = await send(client, streamBlobSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

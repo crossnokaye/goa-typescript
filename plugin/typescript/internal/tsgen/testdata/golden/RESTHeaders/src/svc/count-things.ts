@@ -48,9 +48,10 @@ export type CountThingsError =
  */
 export async function countThings(
   client: Client,
+  payload?: undefined,
   options?: RequestOptions,
 ): Promise<CallResult<CountThingsResult, CountThingsError>> {
-  const sent = await send(client, countThingsSpec, undefined, options);
+  const sent = await send(client, countThingsSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

@@ -75,10 +75,10 @@ export type ListThingsError =
  */
 export async function listThings(
   client: Client,
-  payload: ListThingsPayload,
+  payload?: ListThingsPayload,
   options?: RequestOptions,
 ): Promise<CallResult<ListThingsResult, ListThingsError>> {
-  const wire = encode(ListThingsPayload, payload);
+  const wire = encode(ListThingsPayload, payload ?? {});
   if (!wire.ok) {
     return wire;
   }
@@ -99,10 +99,10 @@ export async function listThings(
  */
 export async function listThingsStream(
   client: Client,
-  payload: ListThingsPayload,
+  payload?: ListThingsPayload,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<Thing>, ListThingsError>> {
-  const wire = encode(ListThingsPayload, payload);
+  const wire = encode(ListThingsPayload, payload ?? {});
   if (!wire.ok) {
     return wire;
   }

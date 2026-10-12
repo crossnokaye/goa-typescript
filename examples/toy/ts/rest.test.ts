@@ -286,8 +286,8 @@ describe("stream_or_list: one method, two functions", () => {
   });
 
   it("shares the request type and the errors between the two", () => {
-    expectTypeOf(toy.streamOrListStream).parameter(1).toEqualTypeOf<toy.StreamOrListPayload>();
-    expectTypeOf(toy.streamOrList).parameter(1).toEqualTypeOf<toy.StreamOrListPayload>();
+    expectTypeOf(toy.streamOrListStream).parameter(1).toEqualTypeOf<toy.StreamOrListPayload | undefined>();
+    expectTypeOf(toy.streamOrList).parameter(1).toEqualTypeOf<toy.StreamOrListPayload | undefined>();
   });
 });
 

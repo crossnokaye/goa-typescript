@@ -58,9 +58,10 @@ export type StatsError =
  */
 export async function stats(
   client: Client,
+  payload?: undefined,
   options?: RequestOptions,
 ): Promise<CallResult<StatsResult, StatsError>> {
-  const sent = await send(client, statsSpec, undefined, options);
+  const sent = await send(client, statsSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

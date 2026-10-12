@@ -2,18 +2,20 @@
 export async function {{ .FuncName }}(
   client: Client,
 {{- if .Endpoint.Request }}
-  payload: {{ .Endpoint.Request.TypeName }},
+  payload{{ if .Endpoint.Request.Optional }}?{{ end }}: {{ .Endpoint.Request.TypeName }},
+{{- else }}
+  payload?: undefined,
 {{- end }}
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<{{ .Endpoint.SSE.EventTypeName }}>, {{ .Endpoint.ErrorTypeName }}>> {
 {{- if .Endpoint.Request }}
-  const wire = encode({{ .Endpoint.Request.TypeName }}, payload);
+  const wire = encode({{ .Endpoint.Request.TypeName }}, payload{{ if .Endpoint.Request.Optional }} ?? {}{{ end }});
   if (!wire.ok) {
     return wire;
   }
   const sent = await send(client, {{ .SpecName }}, wire.value, options);
 {{- else }}
-  const sent = await send(client, {{ .SpecName }}, undefined, options);
+  const sent = await send(client, {{ .SpecName }}, payload, options);
 {{- end }}
   if (!sent.ok) {
     return sent;

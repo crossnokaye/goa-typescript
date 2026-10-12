@@ -65,10 +65,10 @@ export type StreamNamedError =
  */
 export async function streamNamed(
   client: Client,
-  payload: StreamNamedPayload,
+  payload?: StreamNamedPayload,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<StreamNamedEvent>, StreamNamedError>> {
-  const wire = encode(StreamNamedPayload, payload);
+  const wire = encode(StreamNamedPayload, payload ?? {});
   if (!wire.ok) {
     return wire;
   }

@@ -54,9 +54,10 @@ export type StreamTokenOnlyError =
  */
 export async function streamTokenOnly(
   client: Client,
+  payload?: undefined,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<StreamTokenOnlyEvent>, StreamTokenOnlyError>> {
-  const sent = await send(client, streamTokenOnlySpec, undefined, options);
+  const sent = await send(client, streamTokenOnlySpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

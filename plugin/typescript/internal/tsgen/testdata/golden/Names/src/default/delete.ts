@@ -47,9 +47,10 @@ export type Delete_Error =
  */
 export async function delete_(
   client: Client,
+  payload?: undefined,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<Delete_Event>, Delete_Error>> {
-  const sent = await send(client, delete_Spec, undefined, options);
+  const sent = await send(client, delete_Spec, payload, options);
   if (!sent.ok) {
     return sent;
   }

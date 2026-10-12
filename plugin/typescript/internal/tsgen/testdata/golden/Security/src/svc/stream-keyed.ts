@@ -63,10 +63,10 @@ export type StreamKeyedError =
  */
 export async function streamKeyed(
   client: Client,
-  payload: StreamKeyedPayload,
+  payload?: StreamKeyedPayload,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<StreamKeyedEvent>, StreamKeyedError>> {
-  const wire = encode(StreamKeyedPayload, payload);
+  const wire = encode(StreamKeyedPayload, payload ?? {});
   if (!wire.ok) {
     return wire;
   }

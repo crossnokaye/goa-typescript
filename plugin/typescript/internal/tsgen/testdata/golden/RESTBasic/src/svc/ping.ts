@@ -45,9 +45,10 @@ export type PingError =
  */
 export async function ping(
   client: Client,
+  payload?: undefined,
   options?: RequestOptions,
 ): Promise<CallResult<void, PingError>> {
-  const sent = await send(client, pingSpec, undefined, options);
+  const sent = await send(client, pingSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

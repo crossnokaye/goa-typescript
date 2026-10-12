@@ -80,7 +80,10 @@ func (b *builder) buildRequest(e *expr.HTTPEndpointExpr, strip map[string]struct
 	if payload == nil || payload.Type == nil || payload.Type == expr.Empty {
 		return nil, nil
 	}
-	c := &renderCtx{m: b.mapper, refs: refs}
+	// The request is built by the caller: a nested type is referred to by its
+	// request-side variant, so that an attribute the server defaults may be
+	// left out at any depth.
+	c := &renderCtx{m: b.mapper, refs: refs, input: true}
 	req := &RequestSpec{TypeName: typeName, Multipart: e.MultipartRequest}
 	obj := expr.AsObject(payload.Type)
 	req.Scalar = obj == nil

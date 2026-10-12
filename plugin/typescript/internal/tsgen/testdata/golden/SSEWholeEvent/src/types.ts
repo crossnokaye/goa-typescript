@@ -14,3 +14,19 @@ export const Event = z.object({
   id: z.string(),
   at: dateTime().optional(),
 }) satisfies z.ZodType<Event>;
+
+/**
+ * EventRequest is Event as a caller sends it.
+ * An attribute with a default may be left out: the server fills it in.
+ */
+export type EventRequest = {
+  /** Default: "thing" (applied by the server when omitted). */
+  type?: string | undefined;
+  id: string;
+  at?: Date | undefined;
+};
+export const EventRequest = z.object({
+  type: z.string().optional(),
+  id: z.string(),
+  at: dateTime().optional(),
+}) satisfies z.ZodType<EventRequest>;

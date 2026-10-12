@@ -50,14 +50,15 @@ type TypeKind string
 const (
 	// TypeObject is a type with attributes.
 	TypeObject TypeKind = "object"
-	// TypeAlias is a named primitive, array or map.
+	// TypeAlias is a named primitive, array, map or union.
 	TypeAlias TypeKind = "alias"
 )
 
 // TypeSpec describes one hoisted design type: a TypeScript type and a Zod
 // schema of the same name.
 type TypeSpec struct {
-	// GoaName is the name of the type in the design.
+	// GoaName is the name of the type in the design, or the name
+	// Meta("typescript:name") gives an attribute.
 	GoaName string
 	// Name is the TypeScript identifier.
 	Name        string
@@ -74,6 +75,11 @@ type TypeSpec struct {
 	Recursive bool
 	// Props are the properties of an object type.
 	Props []PropSpec
+	// Request is the request-side variant of the type, declared beside it: the
+	// same type with every defaulted attribute optional, referring to the
+	// request-side variants of the types it uses. It is nil when the variant
+	// would not differ from the type.
+	Request *TypeSpec `json:",omitempty"`
 }
 
 // PropSpec describes one property of an object type.

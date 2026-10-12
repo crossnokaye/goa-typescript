@@ -25,3 +25,23 @@ export const Viewed = z.object({
   level: z.int().optional(),
   owner: Owner.optional(),
 }) satisfies z.ZodType<Viewed>;
+
+/**
+ * ViewedRequest is Viewed as a caller sends it.
+ * An attribute with a default may be left out: the server fills it in.
+ */
+export type ViewedRequest = {
+  id: string;
+  name: string;
+  secret?: string | undefined;
+  /** Default: 1 (applied by the server when omitted). */
+  level?: number | undefined;
+  owner?: Owner | undefined;
+};
+export const ViewedRequest = z.object({
+  id: z.string(),
+  name: z.string(),
+  secret: z.string().optional(),
+  level: z.int().optional(),
+  owner: Owner.optional(),
+}) satisfies z.ZodType<ViewedRequest>;

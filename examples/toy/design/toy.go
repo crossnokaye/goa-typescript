@@ -217,6 +217,18 @@ var _ = Service("toy", func() {
 		})
 	})
 
+	Method("echo_thing", func() {
+		Description("Returns the thing it was sent, with the defaults the server applied to it.")
+		PayloadWithToken(func() {
+			Attribute("thing", Thing)
+			Required("thing")
+		})
+		Result(Thing)
+		HTTP(func() {
+			POST("/things/echo")
+		})
+	})
+
 	Method("upsert_thing", func() {
 		Description("Updates a thing, or creates it when the id is \"new\". The status code tells which.")
 		PayloadWithToken(func() {

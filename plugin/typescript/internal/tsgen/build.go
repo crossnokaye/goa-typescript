@@ -90,12 +90,18 @@ func Build(roots []*expr.RootExpr, opts Options) (*PackageSpec, error) {
 			}
 		}
 	}
-	b.mapper.assignNames(newScope(b.reserved))
+	typeScope := newScope(b.reserved)
+	b.mapper.assignNames(typeScope)
+	b.mapper.markRequests(typeScope)
+	b.warnings = append(b.warnings, b.mapper.warnings...)
 	typeRefs := newRefs()
-	for _, ut := range b.mapper.order() {
-		spec := b.mapper.typeSpec(ut, typeRefs)
+	for _, d := range b.mapper.order() {
+		spec := b.mapper.typeSpec(d, typeRefs)
 		pkg.Types = append(pkg.Types, spec)
 		b.typeNames = append(b.typeNames, spec.Name)
+		if spec.Request != nil {
+			b.typeNames = append(b.typeNames, spec.Request.Name)
+		}
 	}
 	// A type never imports itself or its siblings in the same file.
 	typeRefs.types = map[string]struct{}{}

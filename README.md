@@ -48,6 +48,7 @@ Design metadata the plugin reads:
 | `Meta("typescript:package", "@repo/api")` | `API` | npm package name (default `<api-name>-client`) |
 | `Meta("typescript:generate", "false")` | `Service`, `Method` | leaves the service or method out |
 | `Meta("typescript:name", "Thing")` | `Type`, `ResultType` | TypeScript name of the type |
+| `Meta("typescript:name", "ColorKey")` | an inline primitive, enum, array, map or union attribute | hoists the attribute as a named type and schema (see [Models and schemas](#models-and-schemas)) |
 
 ### Generated layout
 
@@ -253,7 +254,23 @@ const fromText = decodeJSON(Thing, text);
 const wire = encode(Thing, thing);                           // local -> wire, validated
 ```
 
-Inline types (a `Payload(func() { ... })`, a nested object, a primitive union branch) are rendered in place; the plugin does not invent names.
+Inline types (a `Payload(func() { ... })`, a nested object, a primitive union branch) are rendered in place; the plugin does not invent names, but the design can give one. `Meta("typescript:name", "ColorKey")` on an inline primitive, enum, array, map or union attribute hoists it into `types.ts` as a named type and schema, carrying the attribute's validations, and the parent refers to it:
+
+```go
+Attribute("color_key", String, func() {
+    Enum("blue", "green")
+    Meta("typescript:name", "ColorKey")
+})
+```
+
+```ts
+export type ColorKey = "blue" | "green";
+export const ColorKey = z.enum(["blue", "green"]) satisfies z.ZodType<ColorKey>;
+
+export type Widget = { color_key: ColorKey; /* ... */ };
+```
+
+An inline object attribute cannot be named this way (declare a `Type` for it; `goa gen` says so), and a `Default` stays with the parent, which is what makes the attribute optional on the request side. Without a name, the usual TypeScript idioms reach an inline type: `Widget["color_key"]` for a required attribute, `NonNullable<Routine["presentation"]>` for an optional one.
 
 | goa | TypeScript | Notes |
 |---|---|---|
@@ -274,7 +291,7 @@ Things worth knowing:
 
 - **Property names are the wire names.** No case conversion: a `created_at` attribute is `created_at` in TypeScript. `Meta("struct:tag:json", "legacyName")` renames the property, as it renames the JSON key.
 - **Optional means absent.** goa omits unset optional attributes, so types use `name?: T`, never `null`. The one exception goa has is handled for you: a `struct:tag:json` override without `,omitempty` makes goa send `null`, which decodes to absent.
-- **Defaults.** Inside a declared type, an attribute with a `Default` is not optional: decoding fills it in. At the top level of a request it is optional, and omitted from the request, because the server applies the default.
+- **Defaults.** Inside a declared type, an attribute with a `Default` is not optional: decoding fills it in. In a request it is optional, and omitted from the request, because the server applies the default. For that, every declared type with a defaulted attribute, and every type that refers to one, gets a request-side variant beside it, `ThingRequest`: the same type and schema with the defaulted attributes optional, referring to `OtherRequest` where `Thing` refers to `Other`. Request payloads use the variants, at any depth, so a nested defaulted attribute may be left out too. `ThingRequest` is also the type for a value built by hand, such as a fixture or a mock, which is why a type no request uses still gets one: `encode(ThingRequest, value)` sends it as is, and a decoded `Thing` is assignable to it. A type whose request side would not differ has no variant. Results and events keep the decoded type, defaults required. (Migrating from a client that typed defaulted attributes as optional: type the fixtures as `ThingRequest` rather than adding the defaults to each of them.) See [ADR 0004](docs/adr/0004-request-side-types.md).
 - **Views.** A result type is one TypeScript type; attributes missing from any of its views are optional.
 - **Recursive types** work (`parent?: Thing`).
 - **Unknown attributes are dropped** when decoding, so a server can add attributes without breaking deployed clients.

@@ -1223,3 +1223,134 @@ var RESTSkippedDSL = func() {
 		})
 	})
 }
+
+// NamedAttrsDSL covers Meta("typescript:name") on inline attributes: hoisted
+// for primitives, arrays, maps and unions; ignored, with a warning, for an
+// inline object and for a user type; rendered in place for a parameter whose
+// encoding differs from the body's.
+var NamedAttrsDSL = func() {
+	var Label = Type("Label", func() {
+		Attribute("key", String)
+		Attribute("value", String)
+		Required("key", "value")
+	})
+	var ColorKeyT = Type("ColorKey", func() {
+		Description("A declared type that takes the name an attribute asks for.")
+		Attribute("hex", String)
+	})
+	var Widget = Type("Widget", func() {
+		Attribute("color_key", String, "The key of the widget's color.", func() {
+			Enum("blue", "green")
+			Meta("typescript:name", "ColorKey")
+		})
+		Attribute("priority", Int, func() {
+			Minimum(1)
+			Maximum(5)
+			Default(3)
+			Meta("typescript:name", "Priority")
+		})
+		Attribute("labels", ArrayOf(Label), func() { Meta("typescript:name", "Labels") })
+		Attribute("scores", MapOf(String, Float64), func() { Meta("typescript:name", "Scores") })
+		Attribute("kinds", ArrayOf(String, func() {
+			Enum("a", "b")
+			Meta("typescript:name", "Kind")
+		}))
+		Attribute("children", ArrayOf("Widget"), func() { Meta("typescript:name", "Widgets") })
+		OneOf("shape", func() {
+			Meta("typescript:name", "Shape")
+			Attribute("circle", Float64)
+			Attribute("label", String)
+		})
+		Attribute("position", func() {
+			Meta("typescript:name", "Position")
+			Attribute("x", Int)
+			Attribute("y", Int)
+		})
+		Attribute("label", Label, func() { Meta("typescript:name", "OneLabel") })
+		Attribute("fallback", ColorKeyT)
+		Required("color_key")
+	})
+	Service("svc", func() {
+		Method("create", func() {
+			Payload(func() {
+				Attribute("widget", Widget)
+				Attribute("view", String, func() {
+					Enum("full", "short")
+					Meta("typescript:name", "View")
+				})
+				Attribute("cursor", Bytes, func() { Meta("typescript:name", "Cursor") })
+				Required("widget")
+			})
+			Result(Widget)
+			HTTP(func() {
+				POST("/widgets")
+				Param("view")
+				Param("cursor")
+			})
+		})
+	})
+}
+
+// RequestsDSL covers the request-side variants of declared types: emitted for a
+// type with a defaulted attribute and for the types that refer to one, and
+// used by request payloads.
+var RequestsDSL = func() {
+	var Plain = Type("Plain", func() {
+		Description("No default anywhere: no input-side variant.")
+		Attribute("id", String)
+		Required("id")
+	})
+	var Snapshot = Type("Snapshot", func() {
+		Attribute("pending", Boolean, func() { Default(false) })
+		Attribute("taken_at", String, func() { Format(FormatDateTime) })
+		Required("taken_at")
+	})
+	var Node = Type("Node", func() {
+		Description("Recursive, with a default.")
+		Attribute("name", String)
+		Attribute("weight", Int, func() { Default(1) })
+		Attribute("children", ArrayOf("Node"))
+		Attribute("plain", Plain)
+		Required("name")
+	})
+	var Report = Type("Report", func() {
+		Description("No default of its own: differs through Snapshot.")
+		Attribute("title", String)
+		Attribute("latest", Snapshot)
+		Attribute("history", ArrayOf(Snapshot))
+		Attribute("by_name", MapOf(String, Snapshot))
+		Attribute("plain", Plain)
+		Required("title", "latest")
+	})
+	var Snapshots = Type("Snapshots", ArrayOf(Snapshot))
+	var SnapshotRequest = Type("SnapshotRequest", func() {
+		Description("Collides with the input-side variant of Snapshot.")
+		Attribute("x", String)
+	})
+	Service("svc", func() {
+		Method("submit", func() {
+			Payload(func() {
+				Attribute("report", Report)
+				Attribute("note", String, func() { Default("none") })
+				Attribute("extra", func() {
+					Attribute("flag", Boolean, func() { Default(true) })
+					Attribute("plain", Plain)
+				})
+				Attribute("named", SnapshotRequest)
+				Attribute("all", Snapshots)
+				Required("report")
+			})
+			Result(Report)
+			HTTP(func() {
+				POST("/reports")
+			})
+		})
+		Method("submit_node", func() {
+			Payload(Node)
+			Result(Node)
+			HTTP(func() {
+				POST("/nodes")
+			})
+		})
+	})
+}

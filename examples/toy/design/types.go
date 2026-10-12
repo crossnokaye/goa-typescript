@@ -33,6 +33,8 @@ var Thing = Type("Thing", func() {
 	Attribute("kind", String, "Kind of thing", func() {
 		Enum("widget", "gadget")
 		Default("widget")
+		// Hoisted as a named type and schema: ThingKind.
+		Meta("typescript:name", "ThingKind")
 	})
 	Attribute("enabled", Boolean, func() {
 		Default(true)

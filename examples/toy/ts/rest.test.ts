@@ -43,7 +43,10 @@ describe("get_thing: a named result with a response header", () => {
   });
 
   it("decodes every type feature of the body", async () => {
-    const { thing } = await unwrapAsync(toy.getThing(client(), { id: "abc" }));
+    const reply = unwrapAsync(toy.getThing(client(), { id: "abc" }));
+    // The bare reply, not `ThingReply | undefined` (issue #2).
+    expectTypeOf(reply).toEqualTypeOf<Promise<ThingReply>>();
+    const { thing } = await reply;
     expectTypeOf(thing).toEqualTypeOf<Thing>();
     expect(thing.created_at?.toISOString()).toBe("2026-01-02T10:04:05.123Z");
     expect(thing.born_on).toBe("2026-01-02");

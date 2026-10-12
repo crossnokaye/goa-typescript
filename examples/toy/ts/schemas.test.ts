@@ -7,6 +7,7 @@ import {
   ThingEvent,
   ThingEventEnvelope,
   ThingFilter,
+  ThingKind,
   toy,
   unwrap,
 } from "toy-client";
@@ -68,6 +69,19 @@ describe("types and schemas share a name", () => {
     expectTypeOf<Thing["born_on"]>().toEqualTypeOf<string | undefined>();
     expectTypeOf<Thing["blob"]>().toEqualTypeOf<Uint8Array | undefined>();
     expectTypeOf<Thing["legacyName"]>().toEqualTypeOf<string | undefined>();
+  });
+});
+
+describe("ThingKind: an inline enum named with Meta(\"typescript:name\")", () => {
+  it("is a type and a schema of its own, used by the parent", () => {
+    expectTypeOf<ThingKind>().toEqualTypeOf<"widget" | "gadget">();
+    expectTypeOf<Thing["kind"]>().toEqualTypeOf<ThingKind>();
+    expectTypeOf<z.output<typeof ThingKind>>().toEqualTypeOf<ThingKind>();
+    expect(unwrap(decode(ThingKind, "gadget"))).toBe("gadget");
+    expect(decode(ThingKind, "sprocket").ok).toBe(false);
+    // The default belongs to the parent, not to the enum.
+    expect(decode(ThingKind, undefined).ok).toBe(false);
+    expect(unwrap(decode(Thing, { id })).kind).toBe("widget");
   });
 });
 

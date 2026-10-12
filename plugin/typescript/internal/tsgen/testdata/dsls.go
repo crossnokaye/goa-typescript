@@ -1223,3 +1223,70 @@ var RESTSkippedDSL = func() {
 		})
 	})
 }
+
+// NamedAttrsDSL covers Meta("typescript:name") on inline attributes: hoisted
+// for primitives, arrays, maps and unions; ignored, with a warning, for an
+// inline object and for a user type; rendered in place for a parameter whose
+// encoding differs from the body's.
+var NamedAttrsDSL = func() {
+	var Label = Type("Label", func() {
+		Attribute("key", String)
+		Attribute("value", String)
+		Required("key", "value")
+	})
+	var ColorKeyT = Type("ColorKey", func() {
+		Description("A declared type that takes the name an attribute asks for.")
+		Attribute("hex", String)
+	})
+	var Widget = Type("Widget", func() {
+		Attribute("color_key", String, "The key of the widget's color.", func() {
+			Enum("blue", "green")
+			Meta("typescript:name", "ColorKey")
+		})
+		Attribute("priority", Int, func() {
+			Minimum(1)
+			Maximum(5)
+			Default(3)
+			Meta("typescript:name", "Priority")
+		})
+		Attribute("labels", ArrayOf(Label), func() { Meta("typescript:name", "Labels") })
+		Attribute("scores", MapOf(String, Float64), func() { Meta("typescript:name", "Scores") })
+		Attribute("kinds", ArrayOf(String, func() {
+			Enum("a", "b")
+			Meta("typescript:name", "Kind")
+		}))
+		Attribute("children", ArrayOf("Widget"), func() { Meta("typescript:name", "Widgets") })
+		OneOf("shape", func() {
+			Meta("typescript:name", "Shape")
+			Attribute("circle", Float64)
+			Attribute("label", String)
+		})
+		Attribute("position", func() {
+			Meta("typescript:name", "Position")
+			Attribute("x", Int)
+			Attribute("y", Int)
+		})
+		Attribute("label", Label, func() { Meta("typescript:name", "OneLabel") })
+		Attribute("fallback", ColorKeyT)
+		Required("color_key")
+	})
+	Service("svc", func() {
+		Method("create", func() {
+			Payload(func() {
+				Attribute("widget", Widget)
+				Attribute("view", String, func() {
+					Enum("full", "short")
+					Meta("typescript:name", "View")
+				})
+				Attribute("cursor", Bytes, func() { Meta("typescript:name", "Cursor") })
+				Required("widget")
+			})
+			Result(Widget)
+			HTTP(func() {
+				POST("/widgets")
+				Param("view")
+				Param("cursor")
+			})
+		})
+	})
+}

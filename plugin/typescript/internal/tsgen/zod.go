@@ -61,9 +61,12 @@ func (c *renderCtx) objectZod(fields []field, indent string) (string, string) {
 // run backwards, and every schema is used to encode as well as to decode.
 func (c *renderCtx) zod(att *expr.AttributeExpr, indent string, param bool) zexpr {
 	if origin, ok := c.m.hoist(att.Type); ok {
-		name := c.m.names[origin]
-		c.refs.types[name] = struct{}{}
-		return zexpr{code: name}
+		return zexpr{code: c.ref(decl{ut: origin})}
+	}
+	// A named attribute is checked before its primitive rendering: the
+	// declaration carries the validations.
+	if d, ok := c.namedAttr(att, param); ok {
+		return zexpr{code: c.ref(d)}
 	}
 	c.refs.zod = true
 	switch t := att.Type.(type) {

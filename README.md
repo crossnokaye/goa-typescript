@@ -48,6 +48,7 @@ Design metadata the plugin reads:
 | `Meta("typescript:package", "@repo/api")` | `API` | npm package name (default `<api-name>-client`) |
 | `Meta("typescript:generate", "false")` | `Service`, `Method` | leaves the service or method out |
 | `Meta("typescript:name", "Thing")` | `Type`, `ResultType` | TypeScript name of the type |
+| `Meta("typescript:name", "ColorKey")` | an inline primitive, enum, array, map or union attribute | hoists the attribute as a named type and schema (see [Models and schemas](#models-and-schemas)) |
 
 ### Generated layout
 
@@ -253,7 +254,23 @@ const fromText = decodeJSON(Thing, text);
 const wire = encode(Thing, thing);                           // local -> wire, validated
 ```
 
-Inline types (a `Payload(func() { ... })`, a nested object, a primitive union branch) are rendered in place; the plugin does not invent names.
+Inline types (a `Payload(func() { ... })`, a nested object, a primitive union branch) are rendered in place; the plugin does not invent names, but the design can give one. `Meta("typescript:name", "ColorKey")` on an inline primitive, enum, array, map or union attribute hoists it into `types.ts` as a named type and schema, carrying the attribute's validations, and the parent refers to it:
+
+```go
+Attribute("color_key", String, func() {
+    Enum("blue", "green")
+    Meta("typescript:name", "ColorKey")
+})
+```
+
+```ts
+export type ColorKey = "blue" | "green";
+export const ColorKey = z.enum(["blue", "green"]) satisfies z.ZodType<ColorKey>;
+
+export type Widget = { color_key: ColorKey; /* ... */ };
+```
+
+An inline object attribute cannot be named this way (declare a `Type` for it; `goa gen` says so), and a `Default` stays with the parent. Without a name, the usual TypeScript idioms reach an inline type: `Widget["color_key"]` for a required attribute, `NonNullable<Routine["presentation"]>` for an optional one.
 
 | goa | TypeScript | Notes |
 |---|---|---|

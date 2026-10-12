@@ -3,11 +3,11 @@
 `github.com/xeger/goa-typescript` provides:
 
 - **`plugin/typescript/`**: a Goa v3 codegen plugin that generates a TypeScript client into `gen/ts`, straight from the design expressions (no OpenAPI step).
-- **`runtime/`**: the small TypeScript runtime that the plugin copies into every generated client (fetch client, typed goa errors, Zod codecs, Server-Sent Events).
+- **`runtime/`**: the small TypeScript runtime that the plugin copies into every generated client (fetch client, response decoding, typed goa errors, Zod codecs, Server-Sent Events).
 
 The generated client is functional (`fn(client, payload, options?)`), returns `Result` values instead of throwing, types goa errors by name, and pairs every design type with a [Zod 4](https://zod.dev) schema of the same name.
 
-**Status:** Server-Sent Events endpoints are generated today. Types and schemas are generated for every HTTP endpoint; functions for REST and WebSocket endpoints are on the [roadmap](#roadmap).
+**Status:** REST and Server-Sent Events endpoints are generated today. Types and schemas are generated for every HTTP endpoint; functions for WebSocket endpoints are on the [roadmap](#roadmap).
 
 ### Try it on a service (minimal)
 
@@ -62,6 +62,7 @@ gen/ts/
     └── <service>/
         ├── index.ts        barrel for the service
         └── <method>.ts     one function per method: its request type, error table, error union
+                            (two functions when the method offers both a plain result and a stream)
 ```
 
 The package is TypeScript source, not a build: `package.json` exports point at `.ts` files, and relative imports use the `.js` suffix that bundler module resolution maps back to them.
@@ -103,6 +104,78 @@ Methods declared with `NoSecurity()` never receive a credential.
 
 **Per-call options** are the last argument of every function: `signal`, `headers`, `timeoutMs`, `baseURL`, and any other `RequestInit` field (`cache`, `credentials`, ...).
 
+### REST methods
+
+A method without streaming becomes a function that resolves to the method's result:
+
+```ts
+import { toy } from "toy-client";
+
+const result = await toy.getThing(client, { id: "abc" }, { signal });
+if (!result.ok) {
+  return handle(result.error); // see Errors
+}
+result.value;                        // ThingReply: decoded and validated, dates already Date objects
+result.response.status;              // the fetch Response, for the status and the headers
+result.response.headers.get("etag");
+```
+
+**The value is the bare goa type.** There is no `{ data }` envelope: what the design calls the `Result` is what `result.value` is, and what `unwrapAsync` returns. Transport metadata rides beside it, on `result.response` ([ADR 0002](docs/adr/0002-response-metadata-beside-the-value.md)). On a failure `result.response` is set whenever a response arrived (a goa error, an unexpected response, a response that fails validation) and absent otherwise (network failure, abort, timeout, a request that fails validation).
+
+| Design | Function |
+|---|---|
+| `Result(Thing)` | `value` is `Thing` |
+| `Result(func() { ... })`, `Result(ArrayOf(String))`, `Result(Int)` | `value` has the type `<Method>Result`, declared in the method's file |
+| `Result(CollectionOf(Thing))` | `value` is `Thing[]`; goa's `ThingCollection` name is not used |
+| no `Result` | `value` is `void` |
+| `Header("etag:ETag")` in a `Response` | the attribute is filled from the header: numbers and booleans are parsed, arrays are split on commas |
+| `Cookie(...)` in a `Response` | the attribute is never set: script cannot read `Set-Cookie` |
+| `Body("attr")` | the body is that attribute |
+| several `Response`s | one value type; `result.response.status` says which response it was |
+| `Tag("outcome", "created")` | the client sets `outcome` to `"created"` for that response, as goa's Go client does |
+
+**Several statuses.** goa picks the response from the result's tag attribute and leaves that attribute out of the body. The client puts it back, so both views agree:
+
+```ts
+const result = await toy.upsertThing(client, { id, name });
+if (result.ok) {
+  result.response.status; // 200 or 201
+  result.value.outcome;   // "updated" or "created"
+}
+```
+
+A response without a body is decoded from its headers and tag alone. If the result type requires an attribute that such a response does not carry, the response cannot be valid: `goa gen` prints a warning, the function's documentation says so, and at run time that status fails with a `ResponseValidationError`. Make the attribute optional in the design, or give the response a body.
+
+**Raw download** (`SkipResponseBodyEncodeDecode`). The value is built from the mapped headers and the body is left unread on the response. This is the one case where `result.response` still has its body:
+
+```ts
+const result = await toy.downloadThing(client, { id });
+if (result.ok) {
+  result.value.content_length;              // from the Content-Length header
+  const blob = await result.response.blob(); // or arrayBuffer(), or result.response.body to stream it
+}
+```
+
+**Raw upload** (`SkipRequestBodyEncodeDecode`). The function takes the body after the payload, or in its place when the method has none, and hands it to `fetch` as is:
+
+```ts
+await toy.uploadThing(client, { id, content_type: file.type }, file);
+```
+
+A `Blob` (so a `File`), an `ArrayBuffer`, `FormData` and a string work everywhere. A `ReadableStream` is sent with `duplex: "half"`, which Safari and Firefox do not support. No `Content-Type` is set unless the design maps a payload attribute to that header; `fetch` derives one from a `Blob` or a string.
+
+**A plain result and a stream** (`Result` and `StreamingResult` on one method). Two functions in one file: `streamOrList()` sends `Accept: application/json` and returns the plain result, `streamOrListStream()` is the [SSE function](#streaming-methods-sse). They share the request type and the error union.
+
+**Not generated**, and listed with the reason at the bottom of the service barrel: `Redirect(...)` endpoints (`fetch` follows the redirect, so there is nothing to return), responses with a non-JSON `ContentType` that are not raw, response headers of type `Bytes` or `Any` (goa does not write them in a form the schema can read back), a raw request body on `GET` or `HEAD`, multipart and form-encoded requests, file servers.
+
+Things worth knowing:
+
+- **Cross-origin headers.** A browser shows script only a short list of response headers from another origin. Unless the UI and the service share an origin, the service must list every header a design maps to an attribute, plus `goa-error` and `goa-view`, in `Access-Control-Expose-Headers`. Without `goa-error` the name of an error is still read from the body of goa's default error type; a custom error type that shares its status code with another error cannot be told apart.
+- **`void` and TanStack Query.** `unwrapAsync(toy.deleteThing(...))` resolves to `undefined`. That is right for `useMutation`. A `useQuery` `queryFn` must not resolve to `undefined`: return something else from it.
+- **A 200 that is not JSON** (a proxy's login page, say) is an `UnexpectedResponseError` carrying the text, not a validation error.
+- **`null` for an empty array or map.** A Go service encodes a nil slice or map result as `null`; the client reads it as empty.
+- **Array headers** are split on commas, so an element that contains one does not survive. goa has the same limit on the way in.
+
 ### Streaming methods (SSE)
 
 A method with `StreamingResult` and `ServerSentEvents()` becomes a function that resolves to an async-iterable `EventStream`:
@@ -125,6 +198,7 @@ for await (const event of result.value) {
 - Leaving the loop (`break`, `return`, an exception) or calling `stream.close()` cancels the response.
 - An event that does not match its schema throws `ResponseValidationError` from the loop and closes the stream. Aborting `signal` throws `AbortError`.
 - Errors the server reports before the first event are ordinary [typed errors](#errors) in `result.error`.
+- The result carries the fetch `Response` like any other function's: `result.response`, which is also `result.value.response` once the stream is open.
 
 **There is no automatic reconnection.** The stream is a plain `fetch` response (so it can send headers and `POST` bodies, unlike `EventSource`), and when to reconnect is the application's call. Resume by passing the last event ID back; the client sends it as `Last-Event-ID`:
 
@@ -193,13 +267,16 @@ Things worth knowing:
 
 ### Errors
 
-Functions never throw. They return `Result<T, E>`:
+Functions never throw. They return `CallResult<T, E>`, which is a `Result<T, E>` with the fetch `Response` beside it:
 
 ```ts
 type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
+type CallResult<T, E> =
+  | { ok: true; value: T; response: Response }
+  | { ok: false; error: E; response?: Response };
 ```
 
-`unwrap(result)` and `unwrapAsync(promise)` turn a failure back into an exception when that is more convenient (inside a TanStack Query `queryFn`, for instance).
+`unwrap(result)` and `unwrapAsync(promise)` turn a failure back into an exception when that is more convenient (inside a TanStack Query `queryFn`, for instance). They return the bare value.
 
 Every function exports its own error union. Every member has a string `kind`:
 
@@ -228,7 +305,23 @@ if (!result.ok) {
 }
 ```
 
-`GoaError` carries goa's `id`, `message`, `temporary`, `timeout` and `fault`, plus the HTTP `status`, `headers` and parsed `body`. Errors that goa raises on its own, such as request validation failures, arrive as `GoaError` too, under names the union cannot list (`GoaError<OtherErrorName>`). `errorMessage(e)` renders any of these for display.
+`GoaError` carries goa's `id`, `message`, `temporary`, `timeout` and `fault`, plus the HTTP `status`, `headers`, parsed `body` and the `response`. Errors that goa raises on its own, such as request validation failures, arrive as `GoaError` too, under names the union cannot list (`GoaError<OtherErrorName>`). `errorMessage(e)` renders any of these for display.
+
+**Custom error types.** An error declared with a type of its own (`Error("invalid", ValidationProblem)`, `Error("conflict", func() { ... })`, `Error("teapot", String)`) is decoded and validated into `detail`. An unnamed type is declared in the method's file as `<Method><Error>Detail`. Attributes that the error's `Response` maps to headers are merged in.
+
+Use `isGoaError(e, name)` to reach the detail. Comparing `e.name` is not enough for the compiler, because an undeclared error may carry any name:
+
+```ts
+const result = await toy.createThing(client, { name });
+if (!result.ok) {
+  if (isGoaError(result.error, "invalid")) {
+    result.error.detail.field;       // ValidationProblem
+    result.error.detail.retry_after; // from the Retry-After header
+  }
+}
+```
+
+The narrowing needs the function's error union to pick from, so it works on `result.error`. In a `catch` block the value is `unknown`: `isGoaError(e, "invalid")` still checks the name, and `e.detail` is `unknown`.
 
 ### Consuming from a pnpm workspace
 
@@ -242,7 +335,7 @@ The generated package is meant to be a workspace member consumed as source:
 
 ### Roadmap
 
-- **REST**: functions for unary endpoints, with multiple statuses, response headers, `Tag`-selected results and raw bodies.
 - **WebSocket**: bidirectional and server-only streams over the native `WebSocket`.
+- **Multipart requests and file servers.**
 
 Until then the service barrel lists the methods it skipped, and their types and schemas are generated all the same.

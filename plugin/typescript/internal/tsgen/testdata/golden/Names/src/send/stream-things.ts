@@ -3,16 +3,14 @@
 import * as z from "zod";
 
 import {
+  type CallResult,
   type Client,
   type ClientError,
   type EndpointSpec,
-  err,
   EventStream,
   type GoaError,
   goaErrorDecoder,
-  ok,
   type OtherErrorName,
-  type Result,
   send,
   sseDecoder,
   type StreamOptions,
@@ -50,20 +48,21 @@ export type StreamThingsError =
 export async function streamThings(
   client: Client,
   options?: StreamOptions,
-): Promise<Result<EventStream<StreamThingsEvent>, StreamThingsError>> {
+): Promise<CallResult<EventStream<StreamThingsEvent>, StreamThingsError>> {
   const sent = await send(client, streamThingsSpec, undefined, options);
   if (!sent.ok) {
     return sent;
   }
   const res = sent.value;
   if (res.status !== 200) {
-    return err(await goaErrorDecoder(streamThingsErrors)(res));
+    return { ok: false, error: await goaErrorDecoder(streamThingsErrors)(res), response: res };
   }
   if (!/^text\/event-stream/i.test(res.headers.get("content-type") ?? "") || !res.body) {
-    return err(new UnexpectedResponseError(res, await res.text()));
+    return { ok: false, error: new UnexpectedResponseError(res, await res.text()), response: res };
   }
-  return ok(
-    new EventStream(
+  return {
+    ok: true,
+    value: new EventStream(
       res,
       sseDecoder(StreamThingsEvent, {
         encoding: "string",
@@ -73,5 +72,6 @@ export async function streamThings(
         retry: null,
       }),
     ),
-  );
+    response: res,
+  };
 }

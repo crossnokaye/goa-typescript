@@ -3,17 +3,15 @@
 import * as z from "zod";
 
 import {
+  type CallResult,
   type Client,
   type ClientError,
   encode,
   type EndpointSpec,
-  err,
   EventStream,
   type GoaError,
   goaErrorDecoder,
-  ok,
   type OtherErrorName,
-  type Result,
   send,
   sseDecoder,
   type StreamOptions,
@@ -79,7 +77,7 @@ export async function watch(
   client: Client,
   payload: WatchPayload2,
   options?: StreamOptions,
-): Promise<Result<EventStream<WatchEvent>, WatchError>> {
+): Promise<CallResult<EventStream<WatchEvent>, WatchError>> {
   const wire = encode(WatchPayload2, payload);
   if (!wire.ok) {
     return wire;
@@ -90,13 +88,14 @@ export async function watch(
   }
   const res = sent.value;
   if (res.status !== 200) {
-    return err(await goaErrorDecoder(watchErrors)(res));
+    return { ok: false, error: await goaErrorDecoder(watchErrors)(res), response: res };
   }
   if (!/^text\/event-stream/i.test(res.headers.get("content-type") ?? "") || !res.body) {
-    return err(new UnexpectedResponseError(res, await res.text()));
+    return { ok: false, error: new UnexpectedResponseError(res, await res.text()), response: res };
   }
-  return ok(
-    new EventStream(
+  return {
+    ok: true,
+    value: new EventStream(
       res,
       sseDecoder(WatchEvent, {
         encoding: "json",
@@ -106,5 +105,6 @@ export async function watch(
         retry: null,
       }),
     ),
-  );
+    response: res,
+  };
 }

@@ -796,3 +796,418 @@ var TwoServicesDSL = func() {
 		})
 	})
 }
+
+// RESTBasicDSL covers the plain shapes of a unary endpoint: a named result,
+// an inline result, no payload and no content.
+var RESTBasicDSL = func() {
+	var Thing = Type("Thing", func() {
+		Attribute("id", String)
+		Attribute("name", String)
+		Attribute("created_at", String, func() { Format(FormatDateTime) })
+		Required("id")
+	})
+	Service("svc", func() {
+		Error("not_found")
+		HTTP(func() {
+			Path("/api")
+			Response("not_found", StatusNotFound)
+		})
+		Method("get_thing", func() {
+			Description("Returns one thing.")
+			Payload(func() {
+				Attribute("id", String)
+				Attribute("verbose", Boolean)
+				Attribute("trace", String)
+				Required("id")
+			})
+			Result(Thing)
+			HTTP(func() {
+				GET("/things/{id}")
+				Param("verbose")
+				Header("trace:X-Trace-Id")
+			})
+		})
+		Method("create_thing", func() {
+			Payload(Thing)
+			Result(Thing)
+			HTTP(func() {
+				POST("/things")
+				Response(StatusCreated)
+			})
+		})
+		Method("stats", func() {
+			Description("The result is declared inline.")
+			Result(func() {
+				Attribute("count", Int)
+				Attribute("newest", String, func() { Format(FormatDateTime) })
+				Required("count")
+			})
+			HTTP(func() {
+				GET("/stats")
+			})
+		})
+		Method("delete_thing", func() {
+			Payload(func() {
+				Attribute("id", String)
+				Required("id")
+			})
+			HTTP(func() {
+				DELETE("/things/{id}")
+				Response(StatusNoContent)
+			})
+		})
+		Method("ping", func() {
+			Description("Neither payload nor result.")
+			HTTP(func() {
+				GET("/ping")
+			})
+		})
+	})
+}
+
+// RESTScalarsDSL covers results that are not objects, collections and views.
+var RESTScalarsDSL = func() {
+	var Item = ResultType("application/vnd.item", func() {
+		TypeName("Item")
+		Attributes(func() {
+			Attribute("id", String)
+			Attribute("secret", String)
+			Required("id", "secret")
+		})
+		View("default", func() {
+			Attribute("id")
+		})
+		View("full", func() {
+			Attribute("id")
+			Attribute("secret")
+		})
+	})
+	var Shelf = Type("Shelf", func() {
+		Attribute("items", CollectionOf(Item))
+	})
+	Service("svc", func() {
+		Method("count", func() {
+			Result(Int)
+			HTTP(func() { GET("/count") })
+		})
+		Method("blob", func() {
+			Result(Bytes)
+			HTTP(func() { GET("/blob") })
+		})
+		Method("names", func() {
+			Result(ArrayOf(String))
+			HTTP(func() { GET("/names") })
+		})
+		Method("when", func() {
+			Result(MapOf(String, String, func() {
+				Elem(func() { Format(FormatDateTime) })
+			}))
+			HTTP(func() { GET("/when") })
+		})
+		Method("list_items", func() {
+			Result(CollectionOf(Item))
+			HTTP(func() { GET("/items") })
+		})
+		Method("get_item", func() {
+			Result(Item)
+			HTTP(func() { GET("/item") })
+		})
+		Method("get_shelf", func() {
+			Result(Shelf)
+			HTTP(func() { GET("/shelf") })
+		})
+	})
+}
+
+// RESTHeadersDSL maps result attributes onto response headers of every shape.
+var RESTHeadersDSL = func() {
+	var Version = Type("Version", Int)
+	var Page = Type("Page", func() {
+		Attribute("items", ArrayOf(String))
+		Attribute("etag", String)
+		Attribute("total", Int)
+		Attribute("ratio", Float64)
+		Attribute("more", Boolean)
+		Attribute("expires", String, func() { Format(FormatDateTime) })
+		Attribute("version", Version)
+		Attribute("tags", ArrayOf(String))
+		Attribute("counts", ArrayOf(Int))
+		Attribute("flags", ArrayOf(Boolean))
+		Attribute("legacy_name", String, func() { Meta("struct:tag:json", "legacyName") })
+		Attribute("session", String)
+		Required("items", "etag", "total")
+	})
+	Service("svc", func() {
+		Method("get_page", func() {
+			Result(Page)
+			HTTP(func() {
+				GET("/page")
+				Response(StatusOK, func() {
+					Header("etag:ETag")
+					Header("total:X-Total")
+					Header("ratio:X-Ratio")
+					Header("more:X-More")
+					Header("expires:Expires-At")
+					Header("version:X-Version")
+					Header("tags:X-Tags")
+					Header("counts:X-Counts")
+					Header("flags:X-Flags")
+					Header("legacy_name:X-Legacy-Name")
+					Cookie("session:SID")
+				})
+			})
+		})
+		Method("head_page", func() {
+			Description("Every attribute travels in a header.")
+			Result(func() {
+				Attribute("etag", String)
+				Attribute("total", Int)
+				Required("etag")
+			})
+			HTTP(func() {
+				HEAD("/page")
+				Response(StatusOK, func() {
+					Header("etag:ETag")
+					Header("total:X-Total")
+				})
+			})
+		})
+		Method("count_things", func() {
+			Description("A primitive result in a header.")
+			Result(Int)
+			HTTP(func() {
+				GET("/count")
+				Response(StatusOK, func() {
+					Header("X-Count")
+				})
+			})
+		})
+		Method("signature", func() {
+			Description("A bytes header cannot be decoded.")
+			Result(func() {
+				Attribute("sig", Bytes)
+			})
+			HTTP(func() {
+				GET("/signature")
+				Response(StatusOK, func() {
+					Header("sig:X-Signature")
+				})
+			})
+		})
+	})
+}
+
+// RESTStatusesDSL covers Body("attr"), several success statuses and tags.
+var RESTStatusesDSL = func() {
+	var Diagram = Type("Diagram", func() {
+		Attribute("svg", String)
+		Required("svg")
+	})
+	var Upserted = Type("Upserted", func() {
+		Attribute("id", String)
+		Attribute("outcome", String, func() { Enum("updated", "created", "accepted") })
+		Required("id")
+	})
+	Service("svc", func() {
+		Method("upsert_thing", func() {
+			Payload(func() {
+				Attribute("id", String)
+				Attribute("name", String)
+				Required("id")
+			})
+			Result(Upserted)
+			HTTP(func() {
+				PUT("/things/{id}")
+				Response(StatusOK)
+				Response(StatusCreated, func() {
+					Tag("outcome", "created")
+				})
+				Response(StatusAccepted, func() {
+					Tag("outcome", "accepted")
+					Body(Empty)
+				})
+			})
+		})
+		Method("find_diagram", func() {
+			Description("An untagged 204 beside a tagged 200 that carries one attribute.")
+			Result(func() {
+				Attribute("diagram", Diagram)
+				Attribute("found", String)
+			})
+			HTTP(func() {
+				GET("/diagram")
+				Response(StatusNoContent, func() {
+					Body(Empty)
+				})
+				Response(StatusOK, func() {
+					Tag("found", "yes")
+					Body("diagram")
+				})
+			})
+		})
+		Method("strict", func() {
+			Description("A required attribute that the 204 does not carry.")
+			Result(func() {
+				Attribute("id", String)
+				Attribute("state", String)
+				Required("id")
+			})
+			HTTP(func() {
+				GET("/strict")
+				Response(StatusOK)
+				Response(StatusNoContent, func() {
+					Tag("state", "gone")
+					Body(Empty)
+				})
+			})
+		})
+	})
+}
+
+// RESTErrorsDSL covers error types: named with a header, unnamed and primitive.
+var RESTErrorsDSL = func() {
+	var ValidationProblem = Type("ValidationProblem", func() {
+		Attribute("field", String)
+		Attribute("message", String)
+		Attribute("retry_after", Int)
+		Required("field", "message")
+	})
+	Service("svc", func() {
+		Method("create_thing", func() {
+			Payload(func() {
+				Attribute("name", String)
+			})
+			Result(String)
+			Error("invalid", ValidationProblem)
+			Error("conflict", func() {
+				Attribute("existing_id", String)
+				Attribute("at", String, func() { Format(FormatDateTime) })
+				Required("existing_id")
+			})
+			Error("teapot", String)
+			Error("busy")
+			HTTP(func() {
+				POST("/things")
+				Response("invalid", StatusUnprocessableEntity, func() {
+					Header("retry_after:Retry-After")
+				})
+				Response("conflict", StatusConflict)
+				Response("teapot", StatusTeapot)
+				Response("busy", StatusServiceUnavailable)
+			})
+		})
+	})
+}
+
+// RESTRawDSL covers bodies that the client does not encode or decode.
+var RESTRawDSL = func() {
+	Service("svc", func() {
+		Method("download", func() {
+			Payload(func() {
+				Attribute("id", String)
+				Required("id")
+			})
+			Result(func() {
+				Attribute("content_length", Int64)
+				Attribute("content_type", String)
+				Required("content_length")
+			})
+			HTTP(func() {
+				GET("/files/{id}")
+				SkipResponseBodyEncodeDecode()
+				Response(StatusOK, func() {
+					ContentType("application/zip")
+					Header("content_length:Content-Length")
+					Header("content_type:Content-Type")
+				})
+			})
+		})
+		Method("download_plain", func() {
+			Description("No result besides the body.")
+			HTTP(func() {
+				GET("/plain")
+				SkipResponseBodyEncodeDecode()
+			})
+		})
+		Method("upload", func() {
+			Payload(func() {
+				Attribute("id", String)
+				Attribute("content_type", String)
+				Required("id")
+			})
+			Result(func() {
+				Attribute("size", Int)
+				Required("size")
+			})
+			HTTP(func() {
+				PUT("/files/{id}")
+				Header("content_type:Content-Type")
+				SkipRequestBodyEncodeDecode()
+			})
+		})
+		Method("upload_anonymous", func() {
+			Description("No payload besides the body.")
+			HTTP(func() {
+				POST("/files")
+				SkipRequestBodyEncodeDecode()
+				Response(StatusNoContent)
+			})
+		})
+	})
+}
+
+// RESTMixedDSL offers one method both as a plain response and as a stream.
+var RESTMixedDSL = func() {
+	var Thing = Type("Thing", func() {
+		Attribute("id", String)
+		Required("id")
+	})
+	Service("svc", func() {
+		Error("not_found")
+		HTTP(func() { Response("not_found", StatusNotFound) })
+		Method("list_things", func() {
+			Description("Lists things, at once or as they are found.")
+			Payload(func() {
+				Attribute("kind", String)
+			})
+			Result(ArrayOf(Thing))
+			StreamingResult(Thing)
+			HTTP(func() {
+				GET("/things")
+				Param("kind")
+				ServerSentEvents()
+			})
+		})
+	})
+}
+
+// RESTSkippedDSL holds the unary endpoints no function is generated for.
+var RESTSkippedDSL = func() {
+	Service("svc", func() {
+		Method("moved", func() {
+			HTTP(func() {
+				GET("/old")
+				Redirect("/new", StatusMovedPermanently)
+			})
+		})
+		Method("page", func() {
+			Result(String)
+			HTTP(func() {
+				GET("/page")
+				Response(StatusOK, func() {
+					ContentType("text/html")
+				})
+			})
+		})
+		Method("fetch_with_body", func() {
+			HTTP(func() {
+				GET("/fetch")
+				SkipRequestBodyEncodeDecode()
+			})
+		})
+		Method("ok", func() {
+			Result(String)
+			HTTP(func() { GET("/ok") })
+		})
+	})
+}

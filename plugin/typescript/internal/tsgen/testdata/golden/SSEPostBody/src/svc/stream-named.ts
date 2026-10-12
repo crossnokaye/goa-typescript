@@ -3,18 +3,16 @@
 import * as z from "zod";
 
 import {
+  type CallResult,
   type Client,
   type ClientError,
   dateTime,
   encode,
   type EndpointSpec,
-  err,
   EventStream,
   type GoaError,
   goaErrorDecoder,
-  ok,
   type OtherErrorName,
-  type Result,
   send,
   sseDecoder,
   type StreamOptions,
@@ -69,7 +67,7 @@ export async function streamNamed(
   client: Client,
   payload: StreamNamedPayload,
   options?: StreamOptions,
-): Promise<Result<EventStream<StreamNamedEvent>, StreamNamedError>> {
+): Promise<CallResult<EventStream<StreamNamedEvent>, StreamNamedError>> {
   const wire = encode(StreamNamedPayload, payload);
   if (!wire.ok) {
     return wire;
@@ -80,13 +78,14 @@ export async function streamNamed(
   }
   const res = sent.value;
   if (res.status !== 200) {
-    return err(await goaErrorDecoder(streamNamedErrors)(res));
+    return { ok: false, error: await goaErrorDecoder(streamNamedErrors)(res), response: res };
   }
   if (!/^text\/event-stream/i.test(res.headers.get("content-type") ?? "") || !res.body) {
-    return err(new UnexpectedResponseError(res, await res.text()));
+    return { ok: false, error: new UnexpectedResponseError(res, await res.text()), response: res };
   }
-  return ok(
-    new EventStream(
+  return {
+    ok: true,
+    value: new EventStream(
       res,
       sseDecoder(StreamNamedEvent, {
         encoding: "string",
@@ -96,5 +95,6 @@ export async function streamNamed(
         retry: null,
       }),
     ),
-  );
+    response: res,
+  };
 }

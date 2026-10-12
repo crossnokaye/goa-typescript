@@ -25,6 +25,8 @@ type builder struct {
 	reserved []string
 	// typeNames are the identifiers of the hoisted types.
 	typeNames []string
+	// warnings collects remarks about the design for PackageSpec.Warnings.
+	warnings []string
 }
 
 // Build turns evaluated designs into the description of the TypeScript
@@ -118,6 +120,7 @@ func Build(roots []*expr.RootExpr, opts Options) (*PackageSpec, error) {
 		}
 		pkg.Services = append(pkg.Services, spec)
 	}
+	pkg.Warnings = b.warnings
 	return pkg, nil
 }
 
@@ -169,27 +172,62 @@ func (b *builder) buildService(spec *ServiceSpec, svc *expr.HTTPServiceExpr) err
 		names = newScope(b.reserved, b.typeNames)
 		files = newScope([]string{"index"})
 	)
+	skip := func(method, reason string) {
+		spec.Skipped = append(spec.Skipped, SkippedEndpoint{Method: method, Reason: reason})
+	}
 	for _, e := range endpoints(svc) {
-		method := e.MethodExpr.Name
+		var (
+			method = e.MethodExpr.Name
+			sse    = e.UsesSSE()
+			// plain is true when a function returns the method's result
+			// from an ordinary response.
+			plain = !sse || e.MethodExpr.HasMixedResults()
+		)
 		switch {
-		case e.UsesSSE():
+		case sse:
 			spec.HasSSE = true
+			spec.HasREST = spec.HasREST || plain
 		case e.UsesWebSocket():
 			spec.HasWS = true
-			spec.Skipped = append(spec.Skipped, SkippedEndpoint{Method: method, Reason: "WebSocket endpoints are not generated yet"})
+			skip(method, "WebSocket endpoints are not generated yet")
 			continue
 		default:
 			spec.HasREST = true
-			spec.Skipped = append(spec.Skipped, SkippedEndpoint{Method: method, Reason: "REST endpoints are not generated yet"})
-			continue
 		}
 		if reason := unsupported(e); reason != "" {
-			spec.Skipped = append(spec.Skipped, SkippedEndpoint{Method: method, Reason: reason})
+			skip(method, reason)
 			continue
 		}
-		ep, err := b.buildSSEEndpoint(e, names, files)
+		if plain {
+			if reason := unsupportedREST(e); reason != "" {
+				if !sse {
+					skip(method, reason)
+					continue
+				}
+				// Only the stream of a mixed method can be generated.
+				skip(method, "plain response: "+reason)
+				plain = false
+			}
+		}
+		var (
+			ep  *EndpointSpec
+			err error
+		)
+		if plain {
+			ep, err = b.buildRESTEndpoint(e, names, files)
+		} else {
+			ep, err = b.buildSSEEndpoint(e, names, files)
+		}
 		if err != nil {
 			return fmt.Errorf("method %q: %w", method, err)
+		}
+		for _, r := range ep.Responses {
+			if len(r.Missing) > 0 {
+				b.warnings = append(b.warnings, fmt.Sprintf(
+					"service %q, method %q: the %d response does not carry the required result attribute(s) %s; "+
+						"the generated client rejects that response with a validation error",
+					spec.Name, method, r.Status, strings.Join(r.Missing, ", ")))
+			}
 		}
 		spec.Endpoints = append(spec.Endpoints, ep)
 	}
@@ -203,6 +241,8 @@ func unsupported(e *expr.HTTPEndpointExpr) string {
 		return "the endpoint has no route"
 	case e.MultipartRequest:
 		return "multipart requests are not supported"
+	case e.FormRequest:
+		return "form-encoded requests are not supported"
 	}
 	return ""
 }
@@ -218,31 +258,28 @@ func route(e *expr.HTTPEndpointExpr) *expr.RouteExpr {
 	return nil
 }
 
-// buildSSEEndpoint builds the function for a Server-Sent Events endpoint.
-func (b *builder) buildSSEEndpoint(e *expr.HTTPEndpointExpr, scope, files *codegen.NameScope) (*EndpointSpec, error) {
+// buildEndpointBase builds what every endpoint file has whatever its
+// transport style: the names, the security bindings and the request. The
+// caller adds the style's own parts, then calls finishEndpoint.
+func (b *builder) buildEndpointBase(
+	e *expr.HTTPEndpointExpr, kind EndpointKind, funcName, accept string, scope, files *codegen.NameScope, refs *refs,
+) (*EndpointSpec, error) {
 	m := e.MethodExpr
 	r := route(e)
-	refs := newRefs()
-
 	ep := &EndpointSpec{
 		MethodName:   m.Name,
 		FileName:     files.Unique(kebab(m.Name)),
 		Description:  m.Description,
-		Kind:         EndpointSSE,
+		Kind:         kind,
 		Mixed:        m.HasMixedResults(),
 		Verb:         r.Method,
 		PathTemplate: r.FullPaths()[0],
-		Accept:       "text/event-stream",
-	}
-	funcName := camel(m.Name)
-	if ep.Mixed {
-		// The plain function keeps the method name; the stream is its sibling.
-		funcName += "Stream"
+		Accept:       accept,
+		RawBody:      e.SkipRequestBodyEncodeDecode,
 	}
 	ep.FuncName = scope.Unique(funcName)
 	// Every other declaration derives from the function name, which is
 	// already unique.
-	base := upperFirst(ep.FuncName)
 	ep.SpecName = scope.Unique(ep.FuncName + "Spec")
 	ep.ErrorsName = scope.Unique(ep.FuncName + "Errors")
 
@@ -252,33 +289,81 @@ func (b *builder) buildSSEEndpoint(e *expr.HTTPEndpointExpr, scope, files *codeg
 		// Supplied through options.lastEventId instead.
 		strip[e.SSE.RequestIDField] = struct{}{}
 	}
-	req, err := b.buildRequest(e, strip, scope.Unique(base+"Payload"), refs)
+	req, err := b.buildRequest(e, strip, scope.Unique(upperFirst(ep.FuncName)+"Payload"), refs)
 	if err != nil {
 		return nil, err
 	}
 	ep.Request = req
+	return ep, nil
+}
 
-	ep.SSE = b.buildSSE(e, scope.Unique(base+"Event"), refs)
-	ep.ResultTS = "EventStream<" + ep.SSE.EventTypeName + ">"
-
-	ep.ErrorTypeName = scope.Unique(base + "Error")
-	b.buildErrors(e, ep, refs)
-	ep.SpecTS = endpointSpecLiteral(ep)
+// finishEndpoint adds the parts that depend on the style-specific ones: the
+// errors, the transport mapping and the imports.
+func (b *builder) finishEndpoint(e *expr.HTTPEndpointExpr, ep *EndpointSpec, scope *codegen.NameScope, refs *refs) {
+	ep.ErrorTypeName = scope.Unique(upperFirst(ep.FuncName) + "Error")
+	b.buildErrors(e, ep, scope, refs)
+	ep.SpecTS = endpointSpecLiteral(ep, ep.Accept)
+	if ep.Stream != nil {
+		ep.Stream.SpecTS = endpointSpecLiteral(ep, ep.Stream.Accept)
+	}
 
 	refs.useRuntime(
-		"type Client", "type ClientError", "type EndpointSpec", "type GoaError", "type OtherErrorName",
-		"type Result", "type StreamOptions",
-		"err", "EventStream", "goaErrorDecoder", "ok", "send", "sseDecoder", "UnexpectedResponseError",
+		"type CallResult", "type Client", "type ClientError", "type EndpointSpec", "type GoaError",
+		"type OtherErrorName", "goaErrorDecoder", "send",
 	)
+	if ep.Kind == EndpointREST {
+		refs.useRuntime("type RequestOptions", "decodeResponse")
+	}
+	if ep.SSE != nil {
+		refs.useRuntime("type StreamOptions", "EventStream", "sseDecoder", "UnexpectedResponseError")
+	}
 	if ep.Request != nil {
 		refs.useRuntime("encode")
 	}
 	ep.Imports = refs.imports()
+}
+
+// buildSSEEndpoint builds the function for a Server-Sent Events endpoint.
+func (b *builder) buildSSEEndpoint(e *expr.HTTPEndpointExpr, scope, files *codegen.NameScope) (*EndpointSpec, error) {
+	refs := newRefs()
+	funcName := camel(e.MethodExpr.Name)
+	if e.MethodExpr.HasMixedResults() {
+		// The plain function, were it generated, would have the method name.
+		funcName += "Stream"
+	}
+	ep, err := b.buildEndpointBase(e, EndpointSSE, funcName, "text/event-stream", scope, files, refs)
+	if err != nil {
+		return nil, err
+	}
+	ep.SSE = b.buildSSE(e, scope.Unique(upperFirst(ep.FuncName)+"Event"), refs)
+	ep.ResultTS = "EventStream<" + ep.SSE.EventTypeName + ">"
+	b.finishEndpoint(e, ep, scope, refs)
+	return ep, nil
+}
+
+// buildRESTEndpoint builds the function for a unary endpoint. A mixed method
+// gets its Server-Sent Events function in the same file.
+func (b *builder) buildRESTEndpoint(e *expr.HTTPEndpointExpr, scope, files *codegen.NameScope) (*EndpointSpec, error) {
+	refs := newRefs()
+	ep, err := b.buildEndpointBase(e, EndpointREST, camel(e.MethodExpr.Name), "application/json", scope, files, refs)
+	if err != nil {
+		return nil, err
+	}
+	ep.ResponsesName = scope.Unique(ep.FuncName + "Responses")
+	b.buildResponses(e, ep, scope, refs)
+	if ep.Mixed {
+		// The plain function keeps the method name; the stream is its sibling.
+		stream := &StreamFuncSpec{FuncName: scope.Unique(ep.FuncName + "Stream"), Accept: "text/event-stream"}
+		stream.SpecName = scope.Unique(stream.FuncName + "Spec")
+		ep.Stream = stream
+		ep.SSE = b.buildSSE(e, scope.Unique(upperFirst(stream.FuncName)+"Event"), refs)
+	}
+	b.finishEndpoint(e, ep, scope, refs)
 	return ep, nil
 }
 
 // buildErrors fills the error table and the error union of an endpoint.
-func (b *builder) buildErrors(e *expr.HTTPEndpointExpr, ep *EndpointSpec, refs *refs) {
+func (b *builder) buildErrors(e *expr.HTTPEndpointExpr, ep *EndpointSpec, scope *codegen.NameScope, refs *refs) {
 	c := &renderCtx{m: b.mapper, refs: refs}
 	seen := make(map[string]struct{})
 	for _, he := range e.HTTPErrors {
@@ -299,8 +384,23 @@ func (b *builder) buildErrors(e *expr.HTTPEndpointExpr, ep *EndpointSpec, refs *
 			Timeout:   hasMeta(att, "goa:error:timeout"),
 			Fault:     hasMeta(att, "goa:error:fault"),
 		}
-		if _, ok := b.mapper.hoist(att.Type); ok && expr.IsObject(att.Type) {
-			spec.TypeName = c.tsType(att, "", false)
+		switch {
+		case spec.Default || att.Type == nil || att.Type == expr.Empty:
+			// Modelled by the runtime.
+		case b.hoisted(att.Type):
+			// The schema is used as a value, so the reference registers the import.
+			spec.TypeName = c.zod(att, "", false).code
+		default:
+			// A type the design does not name: Error("x", func() { ... }) or
+			// Error("x", String).
+			spec.TypeName = scope.Unique(upperFirst(ep.FuncName) + tsIdent(he.Name) + "Detail")
+			spec.Inline = true
+			spec.TSDef = c.tsType(att, "", false)
+			z := c.zod(att, "", false)
+			spec.Zod, spec.ZodNote = z.code, z.note()
+		}
+		if spec.TypeName != "" {
+			spec.Headers = errorHeaders(he.Response, att)
 		}
 		ep.Errors = append(ep.Errors, spec)
 	}
@@ -319,6 +419,9 @@ func (b *builder) buildErrors(e *expr.HTTPEndpointExpr, ep *EndpointSpec, refs *
 				entry := "{ name: " + tsString(ep.Errors[j].Name)
 				if ep.Errors[j].TypeName != "" {
 					entry += ", schema: " + ep.Errors[j].TypeName
+				}
+				if len(ep.Errors[j].Headers) > 0 {
+					entry += ", headers: " + headersLiteral(ep.Errors[j].Headers)
 				}
 				entries = append(entries, entry+" }")
 			}
@@ -348,13 +451,20 @@ func (b *builder) buildErrors(e *expr.HTTPEndpointExpr, ep *EndpointSpec, refs *
 	ep.ErrorTS = u.String()
 }
 
+// hoisted reports whether t is a type declared in src/types.ts.
+func (b *builder) hoisted(t expr.DataType) bool {
+	_, ok := b.mapper.hoist(t)
+	return ok
+}
+
 func hasMeta(att *expr.AttributeExpr, key string) bool {
 	_, ok := att.Meta[key]
 	return ok
 }
 
-// endpointSpecLiteral renders the runtime EndpointSpec of an endpoint.
-func endpointSpecLiteral(ep *EndpointSpec) string {
+// endpointSpecLiteral renders the runtime EndpointSpec of an endpoint for the
+// function that sends the given Accept header.
+func endpointSpecLiteral(ep *EndpointSpec, accept string) string {
 	paramMap := func(params []ParamSpec) string {
 		if len(params) == 0 {
 			return "{}"
@@ -379,19 +489,21 @@ func endpointSpecLiteral(ep *EndpointSpec) string {
 	if req.MapQuery != nil {
 		fmt.Fprintf(&b, "  mapQuery: %s,\n", tsString(req.MapQuery.Prop))
 	}
-	switch req.Body.Kind {
-	case BodyFields:
+	switch {
+	case ep.RawBody:
+		b.WriteString("  body: { kind: \"raw\" },\n")
+	case req.Body.Kind == BodyFields:
 		fields := make([]string, len(req.Body.Fields))
 		for i, f := range req.Body.Fields {
 			fields[i] = tsString(f)
 		}
 		fmt.Fprintf(&b, "  body: { kind: \"fields\", fields: [%s] },\n", strings.Join(fields, ", "))
-	case BodyAttr:
+	case req.Body.Kind == BodyAttr:
 		fmt.Fprintf(&b, "  body: { kind: \"attr\", attr: %s },\n", tsString(req.Body.Attr))
-	case BodyWhole:
+	case req.Body.Kind == BodyWhole:
 		b.WriteString("  body: { kind: \"whole\" },\n")
 	}
-	fmt.Fprintf(&b, "  accept: %s,\n", tsString(ep.Accept))
+	fmt.Fprintf(&b, "  accept: %s,\n", tsString(accept))
 	if len(ep.Security) == 0 {
 		b.WriteString("  security: [],\n")
 	} else {

@@ -3,17 +3,15 @@
 import * as z from "zod";
 
 import {
+  type CallResult,
   type Client,
   type ClientError,
   encode,
   type EndpointSpec,
-  err,
   EventStream,
   type GoaError,
   goaErrorDecoder,
-  ok,
   type OtherErrorName,
-  type Result,
   send,
   sseDecoder,
   type StreamOptions,
@@ -67,7 +65,7 @@ export async function streamJwt(
   client: Client,
   payload: StreamJwtPayload,
   options?: StreamOptions,
-): Promise<Result<EventStream<StreamJwtEvent>, StreamJwtError>> {
+): Promise<CallResult<EventStream<StreamJwtEvent>, StreamJwtError>> {
   const wire = encode(StreamJwtPayload, payload);
   if (!wire.ok) {
     return wire;
@@ -78,13 +76,14 @@ export async function streamJwt(
   }
   const res = sent.value;
   if (res.status !== 200) {
-    return err(await goaErrorDecoder(streamJwtErrors)(res));
+    return { ok: false, error: await goaErrorDecoder(streamJwtErrors)(res), response: res };
   }
   if (!/^text\/event-stream/i.test(res.headers.get("content-type") ?? "") || !res.body) {
-    return err(new UnexpectedResponseError(res, await res.text()));
+    return { ok: false, error: new UnexpectedResponseError(res, await res.text()), response: res };
   }
-  return ok(
-    new EventStream(
+  return {
+    ok: true,
+    value: new EventStream(
       res,
       sseDecoder(StreamJwtEvent, {
         encoding: "string",
@@ -94,5 +93,6 @@ export async function streamJwt(
         retry: null,
       }),
     ),
-  );
+    response: res,
+  };
 }

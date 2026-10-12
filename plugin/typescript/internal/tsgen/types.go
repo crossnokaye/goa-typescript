@@ -1,6 +1,7 @@
 package tsgen
 
 import (
+	"mime"
 	"sort"
 	"strings"
 
@@ -87,13 +88,15 @@ func (r *refs) imports() Imports {
 //
 // Only types the design names qualify. goa also creates user types of its
 // own: wrappers around inline method payloads and results (during `goa gen`,
-// before plugins run), around primitive union branches and around
-// CollectionOf results. Their names are artifacts of the Go generator, so
-// they are rendered inline like the anonymous types they stand for. The empty
-// type and goa's default error type are modelled by the runtime.
+// before plugins run) and around primitive union branches. Their names are
+// artifacts of the Go generator, so they are rendered inline like the
+// anonymous types they stand for. So is the result type CollectionOf(T)
+// creates: goa registers it with the design's result types under the invented
+// name "TCollection", but it is no more than T[]. The empty type and goa's
+// default error type are modelled by the runtime.
 func (m *typeMapper) hoist(t expr.DataType) (expr.UserType, bool) {
 	ut, ok := t.(expr.UserType)
-	if !ok || ut == expr.Empty || expr.IsErrorResult(ut) {
+	if !ok || ut == expr.Empty || expr.IsErrorResult(ut) || isCollection(ut) {
 		return nil, false
 	}
 	origin := ut.Origin()
@@ -101,6 +104,21 @@ func (m *typeMapper) hoist(t expr.DataType) (expr.UserType, bool) {
 		return nil, false
 	}
 	return origin, true
+}
+
+// isCollection reports whether ut is the result type CollectionOf creates: an
+// array whose identifier carries the "type=collection" parameter. goa has no
+// other marker for it.
+func isCollection(ut expr.UserType) bool {
+	rt, ok := ut.(*expr.ResultTypeExpr)
+	if !ok {
+		return false
+	}
+	if _, ok := rt.Attribute().Type.(*expr.Array); !ok {
+		return false
+	}
+	_, params, err := mime.ParseMediaType(rt.Identifier)
+	return err == nil && params["type"] == "collection"
 }
 
 // goaTypeName returns the name of a user type in the design, ignoring the
@@ -438,6 +456,24 @@ func (c *renderCtx) fields(parent *expr.AttributeExpr, obj *expr.Object, opts ob
 		out = append(out, f)
 	}
 	return out
+}
+
+// valueFields resolves the attributes of an object value the way its type and
+// schema are rendered: a named type with its views, an unnamed one as is. It
+// returns nil when the value is not an object.
+func (c *renderCtx) valueFields(att *expr.AttributeExpr) []field {
+	obj := expr.AsObject(att.Type)
+	if obj == nil {
+		return nil
+	}
+	parent, opts := att, objectOpts{}
+	if ut, ok := att.Type.(expr.UserType); ok {
+		parent = ut.Attribute()
+		if rt, ok := ut.(*expr.ResultTypeExpr); ok {
+			opts.views = rt
+		}
+	}
+	return c.fields(parent, obj, opts)
 }
 
 // inEveryView reports whether every view of rt includes the attribute.

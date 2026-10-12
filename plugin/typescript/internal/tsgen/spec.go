@@ -22,6 +22,9 @@ type PackageSpec struct {
 	Services []*ServiceSpec
 	// Runtime are the runtime sources copied into src/runtime.
 	Runtime []RuntimeFile
+	// Warnings are remarks about the design that `goa gen` prints: the client
+	// is generated, but part of it cannot work as designed.
+	Warnings []string
 }
 
 // RuntimeFile is one TypeScript runtime source file.
@@ -117,16 +120,20 @@ const (
 	EndpointWebSocket EndpointKind = "websocket"
 )
 
-// EndpointSpec describes one generated function (src/<service>/<file>.ts).
+// EndpointSpec describes the file generated for one method
+// (src/<service>/<file>.ts). It holds one function, or two when the method
+// offers both a plain and a streamed result.
 type EndpointSpec struct {
 	// MethodName is the method name in the design.
 	MethodName string
-	// FuncName is the exported function name.
+	// FuncName is the exported function name. For a mixed method it is the
+	// function that returns the plain result.
 	FuncName string
 	// FileName is the file name without extension.
 	FileName    string
 	Description string
-	Kind        EndpointKind
+	// Kind is the style of the function named FuncName.
+	Kind EndpointKind
 	// Mixed is true when the method offers both a plain and a streamed result.
 	Mixed bool
 	// Verb is the HTTP method.
@@ -139,25 +146,61 @@ type EndpointSpec struct {
 	SpecName string
 	// SpecTS is the literal assigned to that constant.
 	SpecTS string
+	// Stream is the Server-Sent Events sibling of a mixed method's plain
+	// function; nil otherwise.
+	Stream *StreamFuncSpec
 	// ErrorsName is the exported constant holding the error table.
 	ErrorsName string
 	// Request is nil when the method takes no payload.
-	Request   *RequestSpec
+	Request *RequestSpec
+	// RawBody is true when the function takes the request body as an extra
+	// argument and sends it as is (SkipRequestBodyEncodeDecode).
+	RawBody bool
+	// Result is the value of a REST function; nil for an SSE-only endpoint.
+	Result *ResultSpec
+	// Responses are the success responses of a REST function, by status.
 	Responses []*ResponseSpec
-	Errors    []*ErrorSpec
+	// ResponsesName is the constant holding the response table.
+	ResponsesName string
+	// ResponsesTS is the literal assigned to that constant.
+	ResponsesTS string
+	Errors      []*ErrorSpec
 	// ErrorTypeName is the name of the endpoint's error union.
 	ErrorTypeName string
 	// ErrorTS is the definition of the error union.
 	ErrorTS string
 	// ErrorTable is the literal passed to the error decoder.
 	ErrorTable string
-	// ResultTS is the success type of the function.
+	// ResultTS is the success type of the function named FuncName.
 	ResultTS string
 	Security []SecurityBinding
 	SSE      *SSESpec
 	WS       *WebSocketSpec
 	// Imports is what the endpoint file imports.
 	Imports Imports
+}
+
+// StreamFuncSpec names the Server-Sent Events function of a mixed method. It
+// has its own transport mapping because its Accept header differs.
+type StreamFuncSpec struct {
+	FuncName string
+	SpecName string
+	SpecTS   string
+	Accept   string
+}
+
+// ResultSpec describes the value a REST function returns.
+type ResultSpec struct {
+	// TypeName names the type and its schema; "" when the method has no
+	// result and the value is void.
+	TypeName string
+	// Inline is true when the type is declared in the endpoint file because
+	// the design does not name it.
+	Inline bool
+	// TSDef and Zod define an inline type.
+	TSDef   string
+	Zod     string
+	ZodNote string
 }
 
 // BodyKind says which part of the request becomes the HTTP body.
@@ -230,16 +273,43 @@ type SecurityBinding struct {
 	Attr string
 }
 
+// HeaderSpec maps a response header onto an attribute.
+type HeaderSpec struct {
+	// Attr is the design attribute name.
+	Attr string
+	// Key is the JSON key of the attribute, which is its property name in
+	// the decoded value; "" when the header carries the whole value.
+	Key string
+	// Name is the HTTP header name.
+	Name string
+	// Shape is the kind of value: "string", "number", "boolean" or one of
+	// those followed by "[]".
+	Shape string
+}
+
 // ResponseSpec describes one success response (REST endpoints).
 type ResponseSpec struct {
 	Status      int
 	ContentType string
-	Body        BodyKind
-	Attr        string
-	Headers     []ParamSpec
-	Tag         [2]string
-	ResultTS    string
-	SchemaExpr  string
+	// Body says which part of the result the response body holds.
+	Body BodyKind
+	// Attr is the JSON key of the attribute a BodyAttr body holds.
+	Attr string
+	// NullAs is what a null BodyWhole body stands for: "array", "map" or "".
+	NullAs string
+	// Scalar is true when the result is not an object: the body, or the
+	// single header, is the value itself.
+	Scalar  bool
+	Headers []HeaderSpec
+	// Cookies are the JSON keys of the attributes sent as cookies, which a
+	// browser never shows to script.
+	Cookies []string
+	// Tag is the JSON key of the tag attribute and the value this response
+	// gives it.
+	Tag [2]string
+	// Missing are the JSON keys of the attributes the result requires and
+	// this response does not carry: decoding it fails validation.
+	Missing []string
 }
 
 // ErrorSpec describes one error an endpoint declares.
@@ -248,9 +318,17 @@ type ErrorSpec struct {
 	Status int
 	// Default is true when the error uses goa's default error type.
 	Default bool
-	// TypeName is the hoisted type of a custom error.
-	TypeName  string
-	Headers   []ParamSpec
+	// TypeName names the type of a custom error and its schema.
+	TypeName string
+	// Inline is true when that type is declared in the endpoint file because
+	// the design does not name it.
+	Inline bool
+	// TSDef and Zod define an inline type.
+	TSDef   string
+	Zod     string
+	ZodNote string
+	// Headers are the attributes of a custom error sent as response headers.
+	Headers   []HeaderSpec
 	Temporary bool
 	Timeout   bool
 	Fault     bool

@@ -328,7 +328,8 @@ func TestBuildTwoServices(t *testing.T) {
 	wantEqual(t, "types", typeNames(pkg), []string{"Thing"})
 
 	wantEqual(t, "echo skipped", echo.Skipped, []SkippedEndpoint{{Method: "chat", Reason: "WebSocket endpoints are not generated yet"}})
-	wantEqual(t, "toy skipped", toy.Skipped, []SkippedEndpoint{{Method: "get_thing", Reason: "REST endpoints are not generated yet"}})
+	wantEqual(t, "toy skipped", len(toy.Skipped), 0)
+	wantEqual(t, "toy get_thing", endpoint(t, toy, "get_thing").Kind, EndpointREST)
 	if !echo.HasWS || !echo.HasSSE || !toy.HasREST || !toy.HasSSE {
 		t.Errorf("flags: echo=%+v toy=%+v", echo, toy)
 	}
@@ -447,27 +448,6 @@ func TestBuildSkipsUnsupportedAndOptedOut(t *testing.T) {
 	if len(svc.Endpoints) != 1 || svc.Endpoints[0].MethodName != "ok" {
 		t.Errorf("expected only the ok endpoint, got %d", len(svc.Endpoints))
 	}
-}
-
-func TestBuildMixedResults(t *testing.T) {
-	pkg := build(t, func() {
-		Service("svc", func() {
-			Method("list", func() {
-				Result(ArrayOf(String))
-				StreamingResult(String)
-				HTTP(func() {
-					GET("/list")
-					ServerSentEvents()
-				})
-			})
-		})
-	})
-	ep := endpoint(t, service(t, pkg, "svc"), "list")
-	// The stream is the sibling of the plain function, which is not generated yet.
-	wantEqual(t, "mixed", ep.Mixed, true)
-	wantEqual(t, "func", ep.FuncName, "listStream")
-	wantEqual(t, "event", ep.SSE.EventTypeName, "ListStreamEvent")
-	wantEqual(t, "encoding", ep.SSE.DataEncoding, "string")
 }
 
 func TestDebugFile(t *testing.T) {

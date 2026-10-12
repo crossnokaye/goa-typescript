@@ -40,6 +40,11 @@ func Generate(_ string, roots []eval.Root, files []*codegen.File) ([]*codegen.Fi
 	if err != nil {
 		return nil, fmt.Errorf("goa-typescript: %w", err)
 	}
+	// goa prints nothing of its own between the plugins and the list of
+	// written files, so the warnings land right above that list.
+	for _, w := range spec.Warnings {
+		fmt.Fprintln(os.Stderr, "goa-typescript: warning: "+w)
+	}
 	if os.Getenv("GOA_TYPESCRIPT_DEBUG") != "" {
 		files = append(files, tsgen.DebugFile(spec))
 	}

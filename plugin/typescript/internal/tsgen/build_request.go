@@ -123,10 +123,11 @@ func (b *builder) buildRequest(e *expr.HTTPEndpointExpr, strip map[string]struct
 
 	plainKey := make(map[string]struct{})
 	switch {
+	case e.SkipRequestBodyEncodeDecode:
+		// The caller hands the body to the function; no attribute is in it.
+		req.Body = BodySpec{Kind: BodyRaw}
 	case e.Body == nil || e.Body.Type == nil || e.Body.Type == expr.Empty:
 		req.Body = BodySpec{Kind: BodyNone}
-	case e.SkipRequestBodyEncodeDecode:
-		req.Body = BodySpec{Kind: BodyRaw}
 	case len(e.Body.Meta["origin:attribute"]) > 0:
 		name := e.Body.Meta["origin:attribute"][0]
 		if _, skip := strip[name]; skip {
@@ -160,7 +161,7 @@ func (b *builder) buildRequest(e *expr.HTTPEndpointExpr, strip map[string]struct
 	if req.Scalar {
 		// The value travels either as the body or as the single parameter
 		// or header the design maps it to.
-		param := req.Body.Kind == BodyNone
+		param := req.Body.Kind == BodyNone || req.Body.Kind == BodyRaw
 		req.TSDef = c.tsType(payload, "", param)
 		z := c.zod(payload, "", param)
 		req.Zod, req.ZodNote = z.code, z.note()

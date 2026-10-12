@@ -48,6 +48,14 @@ var fixtures = []struct {
 	{"Security", testdata.SecurityDSL},
 	{"Errors", testdata.ErrorsDSL},
 	{"TwoServices", testdata.TwoServicesDSL},
+	{"RESTBasic", testdata.RESTBasicDSL},
+	{"RESTScalars", testdata.RESTScalarsDSL},
+	{"RESTHeaders", testdata.RESTHeadersDSL},
+	{"RESTStatuses", testdata.RESTStatusesDSL},
+	{"RESTErrors", testdata.RESTErrorsDSL},
+	{"RESTRaw", testdata.RESTRawDSL},
+	{"RESTMixed", testdata.RESTMixedDSL},
+	{"RESTSkipped", testdata.RESTSkippedDSL},
 }
 
 // design evaluates a DSL the way `goa gen` hands it to plugins: evaluated,

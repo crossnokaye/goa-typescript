@@ -4,18 +4,16 @@ import * as z from "zod";
 
 import {
   bytes,
+  type CallResult,
   type Client,
   type ClientError,
   dateTime,
   encode,
   type EndpointSpec,
-  err,
   EventStream,
   type GoaError,
   goaErrorDecoder,
-  ok,
   type OtherErrorName,
-  type Result,
   send,
   sseDecoder,
   type StreamOptions,
@@ -78,7 +76,7 @@ export async function streamFields(
   client: Client,
   payload: StreamFieldsPayload,
   options?: StreamOptions,
-): Promise<Result<EventStream<StreamFieldsEvent>, StreamFieldsError>> {
+): Promise<CallResult<EventStream<StreamFieldsEvent>, StreamFieldsError>> {
   const wire = encode(StreamFieldsPayload, payload);
   if (!wire.ok) {
     return wire;
@@ -89,13 +87,14 @@ export async function streamFields(
   }
   const res = sent.value;
   if (res.status !== 200) {
-    return err(await goaErrorDecoder(streamFieldsErrors)(res));
+    return { ok: false, error: await goaErrorDecoder(streamFieldsErrors)(res), response: res };
   }
   if (!/^text\/event-stream/i.test(res.headers.get("content-type") ?? "") || !res.body) {
-    return err(new UnexpectedResponseError(res, await res.text()));
+    return { ok: false, error: new UnexpectedResponseError(res, await res.text()), response: res };
   }
-  return ok(
-    new EventStream(
+  return {
+    ok: true,
+    value: new EventStream(
       res,
       sseDecoder(StreamFieldsEvent, {
         encoding: "string",
@@ -105,5 +104,6 @@ export async function streamFields(
         retry: null,
       }),
     ),
-  );
+    response: res,
+  };
 }

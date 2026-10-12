@@ -65,7 +65,7 @@ describe("createParser", () => {
       want: [{ data: "a", retry: 10 }, { data: "b" }],
     },
     { name: "colon in value", input: "data: a: b\n\n", want: [{ data: "a: b" }] },
-    { name: "leading BOM is stripped", input: "﻿data: x\n\n", want: [{ data: "x" }] },
+    { name: "leading BOM is stripped", input: "\ufeffdata: x\n\n", want: [{ data: "x" }] },
     { name: "partial event at end of input is discarded", input: "data: a\n\ndata: b\n", want: [{ data: "a" }] },
     { name: "unterminated line at end of input is discarded", input: "data: a", want: [] },
     { name: "JSON payload", input: 'data: {"a":1}\n\n', want: [{ data: '{"a":1}' }] },
@@ -105,6 +105,6 @@ describe("createParser", () => {
   });
 
   it("does not strip a BOM after the first chunk", () => {
-    expect(parse("data: a\n\n", "﻿data: b\n\n").frames).toEqual([{ data: "a" }]);
+    expect(parse("data: a\n\n", "\ufeffdata: b\n\n").frames).toEqual([{ data: "a" }]);
   });
 });

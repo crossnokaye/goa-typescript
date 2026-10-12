@@ -34,10 +34,10 @@ export const Validated = z.object({
 }) satisfies z.ZodType<Validated>;
 
 /**
- * ValidatedInput is Validated as a caller builds it.
+ * ValidatedRequest is Validated as a caller sends it.
  * An attribute with a default may be left out: the server fills it in.
  */
-export type ValidatedInput = {
+export type ValidatedRequest = {
   /** Default: "widget" (applied by the server when omitted). */
   kind?: "widget" | "gadget" | undefined;
   priority?: 1 | 2 | 3 | undefined;
@@ -56,7 +56,7 @@ export type ValidatedInput = {
   tags?: string[] | undefined;
   limits?: Record<string, number> | undefined;
 };
-export const ValidatedInput = z.object({
+export const ValidatedRequest = z.object({
   kind: z.enum(["widget", "gadget"]).optional(),
   priority: z.literal([1, 2, 3]).optional(),
   enabled: z.boolean().optional(),
@@ -69,4 +69,4 @@ export const ValidatedInput = z.object({
   since: dateTime().optional(),
   tags: z.array(z.string()).min(1).max(5).optional(),
   limits: z.record(z.string(), z.int()).refine((m) => Object.keys(m).length >= 1, { message: "must have at least 1 entries" }).refine((m) => Object.keys(m).length <= 3, { message: "must have at most 3 entries" }).optional(),
-}) satisfies z.ZodType<ValidatedInput>;
+}) satisfies z.ZodType<ValidatedRequest>;

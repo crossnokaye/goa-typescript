@@ -81,7 +81,7 @@ func (b *builder) buildRequest(e *expr.HTTPEndpointExpr, strip map[string]struct
 		return nil, nil
 	}
 	// The request is built by the caller: a nested type is referred to by its
-	// input-side variant, so that an attribute the server defaults may be
+	// request-side variant, so that an attribute the server defaults may be
 	// left out at any depth.
 	c := &renderCtx{m: b.mapper, refs: refs, input: true}
 	req := &RequestSpec{TypeName: typeName, Multipart: e.MultipartRequest}

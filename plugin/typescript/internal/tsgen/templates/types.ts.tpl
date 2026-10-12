@@ -5,7 +5,7 @@
 {{- range .Types }}
 
 {{ template "partial_type_decl" . }}
-{{- with .Input }}
+{{- with .Request }}
 
 {{ template "partial_type_decl" . }}
 {{- end }}

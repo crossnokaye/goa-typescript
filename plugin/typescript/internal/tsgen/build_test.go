@@ -184,10 +184,10 @@ func TestBuildSSEPostBody(t *testing.T) {
 	wantEqual(t, "filtered body", filtered.Request.Body, BodySpec{Kind: BodyAttr, Attr: "filter"})
 	wantEqual(t, "filtered path", filtered.Request.Path, []ParamSpec{{Attr: "tenant", Prop: "tenant", Wire: "tenant", Required: true, Shape: "scalar"}})
 	// Filter has a defaulted attribute, so the request refers to its input side.
-	wantEqual(t, "filtered type imports", filtered.Imports.Types, []string{"FilterInput"})
+	wantEqual(t, "filtered type imports", filtered.Imports.Types, []string{"FilterRequest"})
 	wantEqual(t, "filtered body type", filtered.Request.Body, BodySpec{Kind: BodyAttr, Attr: "filter"})
-	if !strings.Contains(filtered.Request.TSDef, "filter: FilterInput;") {
-		t.Errorf("request should take FilterInput:\n%s", filtered.Request.TSDef)
+	if !strings.Contains(filtered.Request.TSDef, "filter: FilterRequest;") {
+		t.Errorf("request should take FilterRequest:\n%s", filtered.Request.TSDef)
 	}
 
 	fields := endpoint(t, svc, "stream_fields")

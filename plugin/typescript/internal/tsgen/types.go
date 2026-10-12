@@ -47,9 +47,9 @@ type typeMapper struct {
 	// named holds every attribute whose Meta("typescript:name") has been
 	// considered, hoisted or not.
 	named map[*expr.AttributeExpr]struct{}
-	// inputs maps the declarations whose input-side variant differs from the
+	// requests maps the declarations whose request-side variant differs from the
 	// declaration to the variant's identifier.
-	inputs map[decl]string
+	requests map[decl]string
 	// warnings are remarks about metadata the mapper cannot honour.
 	warnings []string
 }
@@ -62,7 +62,7 @@ func newTypeMapper(roots ...*expr.RootExpr) *typeMapper {
 		authored:  make(map[expr.UserType]struct{}),
 		attrs:     make(map[*expr.AttributeExpr]decl),
 		named:     make(map[*expr.AttributeExpr]struct{}),
-		inputs:    make(map[decl]string),
+		requests:  make(map[decl]string),
 	}
 	for _, root := range roots {
 		if root == nil {
@@ -351,7 +351,7 @@ func (m *typeMapper) directRefs(d decl) []decl {
 
 // hasInlineDefault reports whether an object attribute rendered as part of d
 // has a default value. Such an attribute is required once decoded and
-// optional when sent, so the input side of d differs from d.
+// optional when sent, so the request side of d differs from d.
 func (m *typeMapper) hasInlineDefault(d decl) bool {
 	found := false
 	m.walkInline(d, func(a *expr.AttributeExpr) {
@@ -368,10 +368,10 @@ func (m *typeMapper) hasInlineDefault(d decl) bool {
 	return found
 }
 
-// markInputs decides which declarations get an input-side variant: those with
+// markRequests decides which declarations get a request-side variant: those with
 // a defaulted attribute, and those that refer to one, directly or not. The
 // variants are named after their declarations, in name order.
-func (m *typeMapper) markInputs(scope *codegen.NameScope) {
+func (m *typeMapper) markRequests(scope *codegen.NameScope) {
 	edges := make(map[decl][]decl, len(m.origins))
 	differs := make(map[decl]bool, len(m.origins))
 	for _, d := range m.origins {
@@ -396,7 +396,7 @@ func (m *typeMapper) markInputs(scope *codegen.NameScope) {
 	sort.SliceStable(sorted, func(i, j int) bool { return m.names[sorted[i]] < m.names[sorted[j]] })
 	for _, d := range sorted {
 		if differs[d] {
-			m.inputs[d] = scope.Unique(m.names[d] + "Input")
+			m.requests[d] = scope.Unique(m.names[d] + "Request")
 		}
 	}
 }
@@ -507,7 +507,7 @@ func (m *typeMapper) order() []decl {
 	return out
 }
 
-// typeSpec renders the declaration of one hoisted type, and its input-side
+// typeSpec renders the declaration of one hoisted type, and its request-side
 // variant when that differs.
 func (m *typeMapper) typeSpec(d decl, r *refs) *TypeSpec {
 	att := d.attribute()
@@ -518,14 +518,14 @@ func (m *typeMapper) typeSpec(d decl, r *refs) *TypeSpec {
 		Kind:        TypeAlias,
 		Recursive:   m.recursive[d],
 	}
-	if name, ok := m.inputs[d]; ok {
-		spec.Input = &TypeSpec{
+	if name, ok := m.requests[d]; ok {
+		spec.Request = &TypeSpec{
 			GoaName:   spec.GoaName,
 			Name:      name,
 			Kind:      TypeAlias,
 			Recursive: spec.Recursive,
 			Description: fmt.Sprintf(
-				"%s is %s as a caller builds it.\nAn attribute with a default may be left out: the server fills it in.",
+				"%s is %s as a caller sends it.\nAn attribute with a default may be left out: the server fills it in.",
 				name, spec.Name),
 		}
 	}
@@ -553,7 +553,7 @@ func (m *typeMapper) typeSpec(d decl, r *refs) *TypeSpec {
 				Optional:    f.optional,
 			})
 		}
-		if in := spec.Input; in != nil {
+		if in := spec.Request; in != nil {
 			in.Kind = TypeObject
 			fields := ci.fields(att, obj, opts)
 			in.TSDef = ci.objectTS(fields, "")
@@ -569,7 +569,7 @@ func (m *typeMapper) typeSpec(d decl, r *refs) *TypeSpec {
 	spec.TSDef = c.tsType(inner, "", false)
 	z := c.zod(inner, zodIndent, false)
 	spec.Zod, spec.ZodNote = z.code, z.note()
-	if in := spec.Input; in != nil {
+	if in := spec.Request; in != nil {
 		in.TSDef = ci.tsType(inner, "", false)
 		z := ci.zod(inner, zodIndent, false)
 		in.Zod, in.ZodNote = z.code, z.note()
@@ -581,9 +581,9 @@ func (m *typeMapper) typeSpec(d decl, r *refs) *TypeSpec {
 type renderCtx struct {
 	m    *typeMapper
 	refs *refs
-	// input renders the input side of a value, the one a caller builds: an
+	// input renders the request side of a value, the one a caller builds: an
 	// attribute with a default is optional, wherever it sits, and a hoisted
-	// type is referred to by its input-side variant when it has one.
+	// type is referred to by its request-side variant when it has one.
 	input bool
 	// inlining holds the unnamed user types being rendered, to stop on a
 	// reference cycle that no named type breaks.
@@ -594,7 +594,7 @@ type renderCtx struct {
 func (c *renderCtx) ref(d decl) string {
 	name := c.m.names[d]
 	if c.input {
-		if in, ok := c.m.inputs[d]; ok {
+		if in, ok := c.m.requests[d]; ok {
 			name = in
 		}
 	}

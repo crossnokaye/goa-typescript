@@ -1,4 +1,4 @@
-# ADR 0004: Input-side types for declared types with defaults
+# ADR 0004: Request-side types for declared types with defaults
 
 - **Date:** 2026-10-12
 - **Status:** Accepted
@@ -28,14 +28,14 @@ It cannot. Every generated schema is a codec, wire to local: `dateTime()` turns 
 
 ## Decision
 
-**Every declared type whose input side differs gets a second declaration beside it, `NameInput`, and request payloads refer to it.**
+**Every declared type whose request side differs gets a second declaration beside it, `NameRequest`, and request payloads refer to it.**
 
-- `NameInput` is the same object type and schema with every attribute that has a `Default` optional (`.optional()` in place of `.default(...)`, and the "Default: x (applied by the server when omitted)" note the top level of a request already carries). Where `Name` refers to a declared type that has a variant, `NameInput` refers to `ThatInput`; arrays and maps follow (`ThatInput[]`). A recursive type refers to its own variant through the same lazy schema the base type uses.
+- `NameRequest` is the same object type and schema with every attribute that has a `Default` optional (`.optional()` in place of `.default(...)`, and the "Default: x (applied by the server when omitted)" note the top level of a request already carries). Where `Name` refers to a declared type that has a variant, `NameRequest` refers to `ThatRequest`; arrays and maps follow (`ThatRequest[]`). A recursive type refers to its own variant through the same lazy schema the base type uses.
 - "Differs" means: the type has a defaulted attribute, in its own object or in an inline object inside it, or it refers, directly or through other declared types, to a type that differs. Nothing is emitted otherwise. A named array or map of a differing type differs too.
-- The name is `Name` + `Input`, run through the same scope as every other declaration: a design type that is already called `SnapshotInput` keeps its name and the variant becomes `SnapshotInput2`.
-- A request payload (`<Method>Payload`) is rendered on the input side: a nested declared type is referred to by its variant, and a defaulted attribute of an inline object is optional, at any depth. The top-level rule is unchanged.
+- The name is `Name` + `Request`, run through the same scope as every other declaration: a design type that is already called `SnapshotRequest` keeps its name and the variant becomes `SnapshotRequest2`.
+- A request payload (`<Method>Payload`) is rendered on the request side: a nested declared type is referred to by its variant, and a defaulted attribute of an inline object is optional, at any depth. The top-level rule is unchanged.
 - Results, events and errors keep the base type: a decoded value has every defaulted attribute, and that is still the only type a response can produce.
-- `NameInput` is the documented type for a value built by hand. A decoded `Name` is assignable to `NameInput`, so a value from a response can be sent back as it is.
+- `NameRequest` is the documented type for a value built by hand, which is why it is emitted for a type no request uses. A decoded `Name` is assignable to `NameRequest`, so a value from a response can be sent back as it is.
 
 ## Consequences
 
@@ -48,25 +48,29 @@ It cannot. Every generated schema is a codec, wire to local: `dateTime()` turns 
 ### Negative / breaking
 
 - `types.ts` grows by one declaration per differing type, with the base type's documentation repeated in shortened form. A design with many defaults doubles its types file.
-- A request's nested types change name: `filter: Filter` becomes `filter: FilterInput`. Code that annotated such a value as `Filter` still compiles (a `Filter` is a `FilterInput`); code that relied on `z.input<typeof FilterInput>` or named the payload's nested type does not. Nothing had been published.
-- Two names for one design type is something to learn. The generated JSDoc on `NameInput` says what it is for.
+- A request's nested types change name: `filter: Filter` becomes `filter: FilterRequest`. Code that annotated such a value as `Filter` still compiles (a `Filter` is a `FilterRequest`); code that relied on `z.input<typeof FilterRequest>` or named the payload's nested type does not. Nothing had been published.
+- Two names for one design type is something to learn. The generated JSDoc on `NameRequest` says what it is for.
 
 ### Neutral
 
-- Whether a type differs is decided while building the spec (`typeMapper.markInputs`), not in the templates, which only render the second declaration when it is there.
+- Whether a type differs is decided while building the spec (`typeMapper.markRequests`), not in the templates, which only render the second declaration when it is there.
 - A variant is emitted whether or not a request uses it: the type is useful on its own, as the base types are.
 
 ## Alternatives considered
 
 1. **Document `z.input<typeof Name>` as the type for hand-built values.** Rejected: it is the wire shape, because the schemas are codecs (above). It would have been right only for types with no date, bytes or nested codec, which is not a distinction a reader can be asked to keep.
 2. **Make defaulted attributes optional in the one type, and have decoding fill them in anyway.** Rejected. The decoded value would be typed looser than it is, and every read of a defaulted attribute would need a check or a `!` for a value that is always present.
-3. **A generic `Input<T>` mapped type in the runtime.** TypeScript cannot tell a defaulted attribute from a required one once the type is declared, so the mapped type would need a per-type list of defaulted keys, which is the same information as a second declaration with none of the schema. The schema is needed: `encode(Name, fixture)` would reject a fixture without its defaults.
-4. **Emit the variant for every declared type, differing or not.** Rejected: twice the declarations for nothing, and `NameInput` would then mean "maybe the same as `Name`". Emitting it only when it differs makes its presence informative.
+3. **A generic `Request<T>` mapped type in the runtime.** TypeScript cannot tell a defaulted attribute from a required one once the type is declared, so the mapped type would need a per-type list of defaulted keys, which is the same information as a second declaration with none of the schema. The schema is needed: `encode(Name, fixture)` would reject a fixture without its defaults.
+4. **Emit the variant for every declared type, differing or not.** Rejected: twice the declarations for nothing, and `NameRequest` would then mean "maybe the same as `Name`". Emitting it only when it differs makes its presence informative.
 5. **A migration note only.** Documents the fixture cost without removing it, and leaves nested request payloads asking for values the server would default.
+
+### Naming
+
+`NameInput` was the first choice and was dropped: "input" already means the wire side in Zod (`z.input<T>`), the very confusion this ADR warns about, so a reader who knows Zod would take `ThingInput` for the shape with string dates. `NameWithDefaults` was considered and rejected on two counts: the decoded base type is the one that has its defaults filled in, so the name points the wrong way, and the variant also exists for types that have no default of their own but refer to one. `NameDraft` was the runner-up. `NameRequest` names the variant's main use, every request payload that nests a defaulting type, and reads naturally for a hand-built value that is about to be sent.
 
 ## References
 
 - GitHub issue #4.
-- `plugin/typescript/internal/tsgen/types.go` (`typeMapper.markInputs`, `renderCtx.input`), `build_request.go`, `templates/types.ts.tpl`.
+- `plugin/typescript/internal/tsgen/types.go` (`typeMapper.markRequests`, `renderCtx.input`), `build_request.go`, `templates/types.ts.tpl`.
 - `examples/toy/design/toy.go` (`echo_thing`), `examples/toy/ts/rest.test.ts`, `examples/toy/ts/schemas.test.ts`.
 - ADR 0001, "One Zod 4 codec per type" and "Hoist only what the design names".

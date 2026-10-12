@@ -84,10 +84,10 @@ export const Widget: z.ZodType<Widget> = z.lazy(() =>
 );
 
 /**
- * WidgetInput is Widget as a caller builds it.
+ * WidgetRequest is Widget as a caller sends it.
  * An attribute with a default may be left out: the server fills it in.
  */
-export type WidgetInput = {
+export type WidgetRequest = {
   /** The key of the widget's color. */
   color_key: ColorKey2;
   /** Default: 3 (applied by the server when omitted). */
@@ -95,7 +95,7 @@ export type WidgetInput = {
   labels?: Labels | undefined;
   scores?: Scores | undefined;
   kinds?: Kind[] | undefined;
-  children?: WidgetsInput | undefined;
+  children?: WidgetsRequest | undefined;
   shape?: Shape | undefined;
   position?: {
     x?: number | undefined;
@@ -104,14 +104,14 @@ export type WidgetInput = {
   label?: Label | undefined;
   fallback?: ColorKey | undefined;
 };
-export const WidgetInput: z.ZodType<WidgetInput> = z.lazy(() =>
+export const WidgetRequest: z.ZodType<WidgetRequest> = z.lazy(() =>
   z.object({
     color_key: ColorKey2,
     priority: Priority.optional(),
     labels: Labels.optional(),
     scores: Scores.optional(),
     kinds: z.array(Kind).optional(),
-    children: WidgetsInput.optional(),
+    children: WidgetsRequest.optional(),
     shape: Shape.optional(),
     position: z.object({
       x: z.int().optional(),
@@ -128,10 +128,10 @@ export const Widgets: z.ZodType<Widgets> = z.lazy(() =>
 );
 
 /**
- * WidgetsInput is Widgets as a caller builds it.
+ * WidgetsRequest is Widgets as a caller sends it.
  * An attribute with a default may be left out: the server fills it in.
  */
-export type WidgetsInput = WidgetInput[];
-export const WidgetsInput: z.ZodType<WidgetsInput> = z.lazy(() =>
-  z.array(WidgetInput),
+export type WidgetsRequest = WidgetRequest[];
+export const WidgetsRequest: z.ZodType<WidgetsRequest> = z.lazy(() =>
+  z.array(WidgetRequest),
 );

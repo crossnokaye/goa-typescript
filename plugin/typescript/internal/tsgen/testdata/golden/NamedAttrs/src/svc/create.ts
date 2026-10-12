@@ -15,16 +15,16 @@ import {
   type RequestOptions,
   send,
 } from "../runtime/index.js";
-import { View, Widget, WidgetInput } from "../types.js";
+import { View, Widget, WidgetRequest } from "../types.js";
 
 /** CreatePayload is the request of create. */
 export type CreatePayload = {
-  widget: WidgetInput;
+  widget: WidgetRequest;
   view?: View | undefined;
   cursor?: string | undefined;
 };
 export const CreatePayload = z.object({
-  widget: WidgetInput,
+  widget: WidgetRequest,
   view: View.optional(),
   cursor: z.string().optional(),
 }) satisfies z.ZodType<CreatePayload>;

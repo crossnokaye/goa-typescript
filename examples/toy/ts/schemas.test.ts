@@ -7,7 +7,7 @@ import {
   ThingEvent,
   ThingEventEnvelope,
   ThingFilter,
-  ThingInput,
+  ThingRequest,
   ThingKind,
   toy,
   unwrap,
@@ -86,25 +86,25 @@ describe("ThingKind: an inline enum named with Meta(\"typescript:name\")", () =>
   });
 });
 
-describe("ThingInput: the input side of a type with defaults", () => {
+describe("ThingRequest: the request side of a type with defaults", () => {
   it("makes the defaulted attributes optional and nothing else", () => {
-    expectTypeOf<ThingInput["kind"]>().toEqualTypeOf<ThingKind | undefined>();
-    expectTypeOf<ThingInput["enabled"]>().toEqualTypeOf<boolean | undefined>();
-    expectTypeOf<ThingInput["id"]>().toEqualTypeOf<string>();
-    // Nested references use the input side too.
-    expectTypeOf<ThingInput["parent"]>().toEqualTypeOf<ThingInput | undefined>();
+    expectTypeOf<ThingRequest["kind"]>().toEqualTypeOf<ThingKind | undefined>();
+    expectTypeOf<ThingRequest["enabled"]>().toEqualTypeOf<boolean | undefined>();
+    expectTypeOf<ThingRequest["id"]>().toEqualTypeOf<string>();
+    // Nested references use the request side too.
+    expectTypeOf<ThingRequest["parent"]>().toEqualTypeOf<ThingRequest | undefined>();
     expectTypeOf<ThingEvent["thing"]>().toEqualTypeOf<Thing | undefined>();
-    expectTypeOf<z.output<typeof ThingInput>>().toEqualTypeOf<ThingInput>();
+    expectTypeOf<z.output<typeof ThingRequest>>().toEqualTypeOf<ThingRequest>();
   });
 
   it("encodes a hand-built value without inventing the defaults", () => {
-    const fixture: ThingInput = { id, name: "fixture", parent: { id } };
-    expect(unwrap(encode(ThingInput, fixture))).toEqual({ id, name: "fixture", parent: { id } });
-    expect(unwrap(decode(ThingInput, { id }))).toEqual({ id });
-    // A decoded Thing is a ThingInput; the reverse needs the defaults.
+    const fixture: ThingRequest = { id, name: "fixture", parent: { id } };
+    expect(unwrap(encode(ThingRequest, fixture))).toEqual({ id, name: "fixture", parent: { id } });
+    expect(unwrap(decode(ThingRequest, { id }))).toEqual({ id });
+    // A decoded Thing is a ThingRequest; the reverse needs the defaults.
     const thing: Thing = unwrap(decode(Thing, { id }));
-    const asInput: ThingInput = thing;
-    expect(asInput.kind).toBe("widget");
+    const asRequest: ThingRequest = thing;
+    expect(asRequest.kind).toBe("widget");
     // @ts-expect-error kind and enabled are required once decoded
     const back: Thing = fixture;
     expect(back).toBe(fixture);

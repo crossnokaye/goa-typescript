@@ -15,20 +15,20 @@ import {
   type RequestOptions,
   send,
 } from "../runtime/index.js";
-import { Node, NodeInput, Plain } from "../types.js";
+import { Node, NodeRequest, Plain } from "../types.js";
 
 /** SubmitNodePayload is the request of submitNode. */
 export type SubmitNodePayload = {
   name: string;
   /** Default: 1 (applied by the server when omitted). */
   weight?: number | undefined;
-  children?: NodeInput[] | undefined;
+  children?: NodeRequest[] | undefined;
   plain?: Plain | undefined;
 };
 export const SubmitNodePayload = z.object({
   name: z.string(),
   weight: z.int().optional(),
-  children: z.array(NodeInput).optional(),
+  children: z.array(NodeRequest).optional(),
   plain: Plain.optional(),
 }) satisfies z.ZodType<SubmitNodePayload>;
 

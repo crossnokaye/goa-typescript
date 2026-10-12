@@ -1291,10 +1291,10 @@ var NamedAttrsDSL = func() {
 	})
 }
 
-// InputsDSL covers the input-side variants of declared types: emitted for a
+// RequestsDSL covers the request-side variants of declared types: emitted for a
 // type with a defaulted attribute and for the types that refer to one, and
 // used by request payloads.
-var InputsDSL = func() {
+var RequestsDSL = func() {
 	var Plain = Type("Plain", func() {
 		Description("No default anywhere: no input-side variant.")
 		Attribute("id", String)
@@ -1323,7 +1323,7 @@ var InputsDSL = func() {
 		Required("title", "latest")
 	})
 	var Snapshots = Type("Snapshots", ArrayOf(Snapshot))
-	var SnapshotInput = Type("SnapshotInput", func() {
+	var SnapshotRequest = Type("SnapshotRequest", func() {
 		Description("Collides with the input-side variant of Snapshot.")
 		Attribute("x", String)
 	})
@@ -1336,7 +1336,7 @@ var InputsDSL = func() {
 					Attribute("flag", Boolean, func() { Default(true) })
 					Attribute("plain", Plain)
 				})
-				Attribute("named", SnapshotInput)
+				Attribute("named", SnapshotRequest)
 				Attribute("all", Snapshots)
 				Required("report")
 			})

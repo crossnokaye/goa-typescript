@@ -29,21 +29,21 @@ export const Node: z.ZodType<Node> = z.lazy(() =>
 );
 
 /**
- * NodeInput is Node as a caller builds it.
+ * NodeRequest is Node as a caller sends it.
  * An attribute with a default may be left out: the server fills it in.
  */
-export type NodeInput = {
+export type NodeRequest = {
   name: string;
   /** Default: 1 (applied by the server when omitted). */
   weight?: number | undefined;
-  children?: NodeInput[] | undefined;
+  children?: NodeRequest[] | undefined;
   plain?: Plain | undefined;
 };
-export const NodeInput: z.ZodType<NodeInput> = z.lazy(() =>
+export const NodeRequest: z.ZodType<NodeRequest> = z.lazy(() =>
   z.object({
     name: z.string(),
     weight: z.int().optional(),
-    children: z.array(NodeInput).optional(),
+    children: z.array(NodeRequest).optional(),
     plain: Plain.optional(),
   }),
 );
@@ -58,18 +58,18 @@ export const Snapshot = z.object({
 }) satisfies z.ZodType<Snapshot>;
 
 /**
- * SnapshotInput2 is Snapshot as a caller builds it.
+ * SnapshotRequest2 is Snapshot as a caller sends it.
  * An attribute with a default may be left out: the server fills it in.
  */
-export type SnapshotInput2 = {
+export type SnapshotRequest2 = {
   /** Default: false (applied by the server when omitted). */
   pending?: boolean | undefined;
   taken_at: Date;
 };
-export const SnapshotInput2 = z.object({
+export const SnapshotRequest2 = z.object({
   pending: z.boolean().optional(),
   taken_at: dateTime(),
-}) satisfies z.ZodType<SnapshotInput2>;
+}) satisfies z.ZodType<SnapshotRequest2>;
 
 /** No default of its own: differs through Snapshot. */
 export type Report = {
@@ -88,38 +88,38 @@ export const Report = z.object({
 }) satisfies z.ZodType<Report>;
 
 /**
- * ReportInput is Report as a caller builds it.
+ * ReportRequest is Report as a caller sends it.
  * An attribute with a default may be left out: the server fills it in.
  */
-export type ReportInput = {
+export type ReportRequest = {
   title: string;
-  latest: SnapshotInput2;
-  history?: SnapshotInput2[] | undefined;
-  by_name?: Record<string, SnapshotInput2> | undefined;
+  latest: SnapshotRequest2;
+  history?: SnapshotRequest2[] | undefined;
+  by_name?: Record<string, SnapshotRequest2> | undefined;
   plain?: Plain | undefined;
 };
-export const ReportInput = z.object({
+export const ReportRequest = z.object({
   title: z.string(),
-  latest: SnapshotInput2,
-  history: z.array(SnapshotInput2).optional(),
-  by_name: z.record(z.string(), SnapshotInput2).optional(),
+  latest: SnapshotRequest2,
+  history: z.array(SnapshotRequest2).optional(),
+  by_name: z.record(z.string(), SnapshotRequest2).optional(),
   plain: Plain.optional(),
-}) satisfies z.ZodType<ReportInput>;
+}) satisfies z.ZodType<ReportRequest>;
 
 /** Collides with the input-side variant of Snapshot. */
-export type SnapshotInput = {
+export type SnapshotRequest = {
   x?: string | undefined;
 };
-export const SnapshotInput = z.object({
+export const SnapshotRequest = z.object({
   x: z.string().optional(),
-}) satisfies z.ZodType<SnapshotInput>;
+}) satisfies z.ZodType<SnapshotRequest>;
 
 export type Snapshots = Snapshot[];
 export const Snapshots = z.array(Snapshot) satisfies z.ZodType<Snapshots>;
 
 /**
- * SnapshotsInput is Snapshots as a caller builds it.
+ * SnapshotsRequest is Snapshots as a caller sends it.
  * An attribute with a default may be left out: the server fills it in.
  */
-export type SnapshotsInput = SnapshotInput2[];
-export const SnapshotsInput = z.array(SnapshotInput2) satisfies z.ZodType<SnapshotsInput>;
+export type SnapshotsRequest = SnapshotRequest2[];
+export const SnapshotsRequest = z.array(SnapshotRequest2) satisfies z.ZodType<SnapshotsRequest>;

@@ -15,11 +15,11 @@ import {
   type RequestOptions,
   send,
 } from "../runtime/index.js";
-import { Plain, Report, ReportInput, SnapshotInput, SnapshotsInput } from "../types.js";
+import { Plain, Report, ReportRequest, SnapshotRequest, SnapshotsRequest } from "../types.js";
 
 /** SubmitPayload is the request of submit. */
 export type SubmitPayload = {
-  report: ReportInput;
+  report: ReportRequest;
   /** Default: "none" (applied by the server when omitted). */
   note?: string | undefined;
   extra?: {
@@ -27,18 +27,18 @@ export type SubmitPayload = {
     flag?: boolean | undefined;
     plain?: Plain | undefined;
   } | undefined;
-  named?: SnapshotInput | undefined;
-  all?: SnapshotsInput | undefined;
+  named?: SnapshotRequest | undefined;
+  all?: SnapshotsRequest | undefined;
 };
 export const SubmitPayload = z.object({
-  report: ReportInput,
+  report: ReportRequest,
   note: z.string().optional(),
   extra: z.object({
     flag: z.boolean().optional(),
     plain: Plain.optional(),
   }).optional(),
-  named: SnapshotInput.optional(),
-  all: SnapshotsInput.optional(),
+  named: SnapshotRequest.optional(),
+  all: SnapshotsRequest.optional(),
 }) satisfies z.ZodType<SubmitPayload>;
 
 const submitSpec: EndpointSpec = {

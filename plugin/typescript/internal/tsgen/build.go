@@ -92,15 +92,15 @@ func Build(roots []*expr.RootExpr, opts Options) (*PackageSpec, error) {
 	}
 	typeScope := newScope(b.reserved)
 	b.mapper.assignNames(typeScope)
-	b.mapper.markInputs(typeScope)
+	b.mapper.markRequests(typeScope)
 	b.warnings = append(b.warnings, b.mapper.warnings...)
 	typeRefs := newRefs()
 	for _, d := range b.mapper.order() {
 		spec := b.mapper.typeSpec(d, typeRefs)
 		pkg.Types = append(pkg.Types, spec)
 		b.typeNames = append(b.typeNames, spec.Name)
-		if spec.Input != nil {
-			b.typeNames = append(b.typeNames, spec.Input.Name)
+		if spec.Request != nil {
+			b.typeNames = append(b.typeNames, spec.Request.Name)
 		}
 	}
 	// A type never imports itself or its siblings in the same file.

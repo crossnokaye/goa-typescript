@@ -17,15 +17,15 @@ import {
   type StreamOptions,
   UnexpectedResponseError,
 } from "../runtime/index.js";
-import { FilterInput } from "../types.js";
+import { FilterRequest } from "../types.js";
 
 /** StreamFilteredPayload is the request of streamFiltered. */
 export type StreamFilteredPayload = {
-  filter: FilterInput;
+  filter: FilterRequest;
   tenant: string;
 };
 export const StreamFilteredPayload = z.object({
-  filter: FilterInput,
+  filter: FilterRequest,
   tenant: z.string(),
 }) satisfies z.ZodType<StreamFilteredPayload>;
 

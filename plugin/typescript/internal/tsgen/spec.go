@@ -75,11 +75,11 @@ type TypeSpec struct {
 	Recursive bool
 	// Props are the properties of an object type.
 	Props []PropSpec
-	// Input is the input-side variant of the type, declared beside it: the
+	// Request is the request-side variant of the type, declared beside it: the
 	// same type with every defaulted attribute optional, referring to the
-	// input-side variants of the types it uses. It is nil when the variant
+	// request-side variants of the types it uses. It is nil when the variant
 	// would not differ from the type.
-	Input *TypeSpec `json:",omitempty"`
+	Request *TypeSpec `json:",omitempty"`
 }
 
 // PropSpec describes one property of an object type.

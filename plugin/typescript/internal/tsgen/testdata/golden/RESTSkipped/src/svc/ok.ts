@@ -44,9 +44,10 @@ export type Ok2Error =
 /** GET /ok */
 export async function ok2(
   client: Client,
+  payload?: undefined,
   options?: RequestOptions,
 ): Promise<CallResult<Ok2Result, Ok2Error>> {
-  const sent = await send(client, ok2Spec, undefined, options);
+  const sent = await send(client, ok2Spec, payload, options);
   if (!sent.ok) {
     return sent;
   }

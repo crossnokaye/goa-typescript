@@ -43,13 +43,17 @@ export type UploadAnonymousError =
  *
  * `body` is sent as the request body, as is. A `ReadableStream` does not work in
  * every browser; a `Blob`, an `ArrayBuffer`, `FormData` or a string does.
+ *
+ * The method has no payload: pass `undefined` as `payload`, which keeps `body` in
+ * the place every function has it.
  */
 export async function uploadAnonymous(
   client: Client,
+  payload: undefined,
   body: BodyInit,
   options?: RequestOptions,
 ): Promise<CallResult<void, UploadAnonymousError>> {
-  const sent = await send(client, uploadAnonymousSpec, undefined, options, body);
+  const sent = await send(client, uploadAnonymousSpec, payload, options, body);
   if (!sent.ok) {
     return sent;
   }

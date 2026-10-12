@@ -60,9 +60,10 @@ export type StrictError =
  */
 export async function strict(
   client: Client,
+  payload?: undefined,
   options?: RequestOptions,
 ): Promise<CallResult<StrictResult, StrictError>> {
-  const sent = await send(client, strictSpec, undefined, options);
+  const sent = await send(client, strictSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

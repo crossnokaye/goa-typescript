@@ -44,9 +44,10 @@ export type CountError =
 /** GET /count */
 export async function count(
   client: Client,
+  payload?: undefined,
   options?: RequestOptions,
 ): Promise<CallResult<CountResult, CountError>> {
-  const sent = await send(client, countSpec, undefined, options);
+  const sent = await send(client, countSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

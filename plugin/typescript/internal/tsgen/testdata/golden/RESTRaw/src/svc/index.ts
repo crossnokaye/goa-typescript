@@ -4,3 +4,4 @@ export * from "./download.js";
 export * from "./download-plain.js";
 export * from "./upload.js";
 export * from "./upload-anonymous.js";
+export * from "./upload-tagged.js";

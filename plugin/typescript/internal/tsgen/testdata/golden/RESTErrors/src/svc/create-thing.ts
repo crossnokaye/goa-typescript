@@ -79,10 +79,10 @@ export type CreateThingError =
 /** POST /things */
 export async function createThing(
   client: Client,
-  payload: CreateThingPayload,
+  payload?: CreateThingPayload,
   options?: RequestOptions,
 ): Promise<CallResult<CreateThingResult, CreateThingError>> {
-  const wire = encode(CreateThingPayload, payload);
+  const wire = encode(CreateThingPayload, payload ?? {});
   if (!wire.ok) {
     return wire;
   }

@@ -42,9 +42,10 @@ export type StreamRenamedIdError =
  */
 export async function streamRenamedId(
   client: Client,
+  payload?: undefined,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<Envelope>, StreamRenamedIdError>> {
-  const sent = await send(client, streamRenamedIdSpec, undefined, options);
+  const sent = await send(client, streamRenamedIdSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

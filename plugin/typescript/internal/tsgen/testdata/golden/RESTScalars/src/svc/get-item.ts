@@ -39,9 +39,10 @@ export type GetItemError =
 /** GET /item */
 export async function getItem(
   client: Client,
+  payload?: undefined,
   options?: RequestOptions,
 ): Promise<CallResult<Item, GetItemError>> {
-  const sent = await send(client, getItemSpec, undefined, options);
+  const sent = await send(client, getItemSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

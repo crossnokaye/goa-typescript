@@ -45,9 +45,10 @@ export type ListItemsError =
 /** GET /items */
 export async function listItems(
   client: Client,
+  payload?: undefined,
   options?: RequestOptions,
 ): Promise<CallResult<ListItemsResult, ListItemsError>> {
-  const sent = await send(client, listItemsSpec, undefined, options);
+  const sent = await send(client, listItemsSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

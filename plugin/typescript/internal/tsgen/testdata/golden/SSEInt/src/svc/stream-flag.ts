@@ -47,9 +47,10 @@ export type StreamFlagError =
  */
 export async function streamFlag(
   client: Client,
+  payload?: undefined,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<StreamFlagEvent>, StreamFlagError>> {
-  const sent = await send(client, streamFlagSpec, undefined, options);
+  const sent = await send(client, streamFlagSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

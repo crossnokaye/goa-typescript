@@ -61,10 +61,10 @@ export type StreamBasicError =
  */
 export async function streamBasic(
   client: Client,
-  payload: StreamBasicPayload,
+  payload?: StreamBasicPayload,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<StreamBasicEvent>, StreamBasicError>> {
-  const wire = encode(StreamBasicPayload, payload);
+  const wire = encode(StreamBasicPayload, payload ?? {});
   if (!wire.ok) {
     return wire;
   }

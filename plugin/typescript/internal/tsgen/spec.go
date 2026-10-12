@@ -234,11 +234,16 @@ type RequestSpec struct {
 	// ZodNote is a trailing comment for the schema declaration.
 	ZodNote string
 	// Scalar is true when the payload is not an object.
-	Scalar  bool
-	Path    []ParamSpec
-	Query   []ParamSpec
-	Headers []ParamSpec
-	Cookies []ParamSpec
+	Scalar bool
+	// Optional is true when the payload argument may be omitted: the payload
+	// is an object none of whose properties is required. A scalar payload is
+	// never optional, nor is the payload of a function that takes a raw body,
+	// because an optional parameter cannot precede a required one.
+	Optional bool
+	Path     []ParamSpec
+	Query    []ParamSpec
+	Headers  []ParamSpec
+	Cookies  []ParamSpec
 	// MapQuery is the property whose entries spread into the query string;
 	// its Prop is "" when the payload itself is the map.
 	MapQuery  *ParamSpec

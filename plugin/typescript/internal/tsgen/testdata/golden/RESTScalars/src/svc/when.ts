@@ -45,9 +45,10 @@ export type WhenError =
 /** GET /when */
 export async function when(
   client: Client,
+  payload?: undefined,
   options?: RequestOptions,
 ): Promise<CallResult<WhenResult, WhenError>> {
-  const sent = await send(client, whenSpec, undefined, options);
+  const sent = await send(client, whenSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

@@ -44,9 +44,10 @@ export type NamesError =
 /** GET /names */
 export async function names(
   client: Client,
+  payload?: undefined,
   options?: RequestOptions,
 ): Promise<CallResult<NamesResult, NamesError>> {
-  const sent = await send(client, namesSpec, undefined, options);
+  const sent = await send(client, namesSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

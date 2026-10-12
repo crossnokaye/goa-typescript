@@ -53,9 +53,10 @@ export type StreamCounterError =
  */
 export async function streamCounter(
   client: Client,
+  payload?: undefined,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<StreamCounterEvent>, StreamCounterError>> {
-  const sent = await send(client, streamCounterSpec, undefined, options);
+  const sent = await send(client, streamCounterSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

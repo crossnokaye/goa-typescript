@@ -54,9 +54,10 @@ export type StreamKeyHeaderError =
  */
 export async function streamKeyHeader(
   client: Client,
+  payload?: undefined,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<StreamKeyHeaderEvent>, StreamKeyHeaderError>> {
-  const sent = await send(client, streamKeyHeaderSpec, undefined, options);
+  const sent = await send(client, streamKeyHeaderSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

@@ -55,9 +55,10 @@ export type StreamEitherError =
  */
 export async function streamEither(
   client: Client,
+  payload?: undefined,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<StreamEitherEvent>, StreamEitherError>> {
-  const sent = await send(client, streamEitherSpec, undefined, options);
+  const sent = await send(client, streamEitherSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

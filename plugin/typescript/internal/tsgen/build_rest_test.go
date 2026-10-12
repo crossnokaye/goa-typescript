@@ -293,13 +293,73 @@ func TestBuildRESTRaw(t *testing.T) {
 		t.Errorf("transport mapping should declare a raw body:\n%s", anonymous.SpecTS)
 	}
 
+	if !strings.Contains(restDoc(anonymous), "pass `undefined` as `payload`") {
+		t.Errorf("documentation should explain the placeholder payload:\n%s", restDoc(anonymous))
+	}
+
+	// An optional parameter cannot precede a required one, so the payload of
+	// a raw-body function is always required, even when every attribute is
+	// optional or there is no payload at all.
+	tagged := endpoint(t, svc, "upload_tagged")
+	wantEqual(t, "tagged raw", tagged.RawBody, true)
+	wantEqual(t, "tagged optional", tagged.Request.Optional, false)
+
 	files := renderTo(t, build(t, testdata.RESTRawDSL), t.TempDir())
 	for file, want := range map[string]string{
 		"src/svc/upload.ts":           "  payload: UploadPayload,\n  body: BodyInit,\n  options?: RequestOptions,\n",
-		"src/svc/upload-anonymous.ts": "  client: Client,\n  body: BodyInit,\n  options?: RequestOptions,\n",
+		"src/svc/upload-tagged.ts":    "  payload: UploadTaggedPayload,\n  body: BodyInit,\n  options?: RequestOptions,\n",
+		"src/svc/upload-anonymous.ts": "  client: Client,\n  payload: undefined,\n  body: BodyInit,\n  options?: RequestOptions,\n",
 	} {
 		if !strings.Contains(files[file], want) {
 			t.Errorf("%s should take the body after the payload:\n%s", file, files[file])
+		}
+	}
+}
+
+// TestBuildOptionalPayload covers the one call shape every function has,
+// `fn(client, payload?, options?)`: the payload is optional exactly when it is
+// an object with no required property, and `undefined` when the method has
+// none.
+func TestBuildOptionalPayload(t *testing.T) {
+	basic := service(t, build(t, testdata.RESTBasicDSL), "svc")
+	wantEqual(t, "required attribute", endpoint(t, basic, "get_thing").Request.Optional, false)
+	wantEqual(t, "required type", endpoint(t, basic, "create_thing").Request.Optional, false)
+	if ping := endpoint(t, basic, "ping"); ping.Request != nil {
+		t.Errorf("no payload, yet the request is %+v", ping.Request)
+	}
+
+	mixed := service(t, build(t, testdata.RESTMixedDSL), "svc")
+	list := endpoint(t, mixed, "list_things")
+	wantEqual(t, "all optional", list.Request.Optional, true)
+
+	// A scalar payload is the value itself: there is nothing to default it to.
+	strings_ := service(t, build(t, testdata.SSEStringDSL), "svc")
+	one := endpoint(t, strings_, "stream_one")
+	wantEqual(t, "scalar", one.Request.Scalar, true)
+	wantEqual(t, "scalar optional", one.Request.Optional, false)
+
+	// Security attributes are stripped before the decision: a payload left
+	// with only optional attributes is optional.
+	security := service(t, build(t, testdata.SecurityDSL), "svc")
+	wantEqual(t, "keyed", endpoint(t, security, "stream_keyed").Request.Optional, true)
+	if only := endpoint(t, security, "stream_token_only"); only.Request != nil {
+		t.Errorf("nothing is left of the payload, yet the request is %+v", only.Request)
+	}
+
+	for name, dsl := range map[string]func(){"basic": testdata.RESTBasicDSL, "mixed": testdata.RESTMixedDSL} {
+		files := renderTo(t, build(t, dsl), t.TempDir())
+		for file, want := range map[string]string{
+			"src/svc/ping.ts":      "  client: Client,\n  payload?: undefined,\n  options?: RequestOptions,\n",
+			"src/svc/get-thing.ts": "  client: Client,\n  payload: GetThingPayload,\n  options?: RequestOptions,\n",
+			"src/svc/list-things.ts": "  client: Client,\n  payload?: ListThingsPayload,\n  options?: RequestOptions,\n" +
+				"): Promise<CallResult<ListThingsResult, ListThingsError>> {\n  const wire = encode(ListThingsPayload, payload ?? {});\n",
+		} {
+			if content, ok := files[file]; ok && !strings.Contains(content, want) {
+				t.Errorf("%s/%s should take the payload second:\n%s", name, file, content)
+			}
+		}
+		if content, ok := files["src/svc/list-things.ts"]; ok && !strings.Contains(content, "  payload?: ListThingsPayload,\n  options?: StreamOptions,\n") {
+			t.Errorf("the stream function should take the payload second too:\n%s", content)
 		}
 	}
 }

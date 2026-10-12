@@ -39,9 +39,10 @@ export type GetShelfError =
 /** GET /shelf */
 export async function getShelf(
   client: Client,
+  payload?: undefined,
   options?: RequestOptions,
 ): Promise<CallResult<Shelf, GetShelfError>> {
-  const sent = await send(client, getShelfSpec, undefined, options);
+  const sent = await send(client, getShelfSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

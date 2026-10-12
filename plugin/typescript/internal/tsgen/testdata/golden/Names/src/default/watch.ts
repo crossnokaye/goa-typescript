@@ -75,10 +75,10 @@ export type WatchError =
  */
 export async function watch(
   client: Client,
-  payload: WatchPayload2,
+  payload?: WatchPayload2,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<WatchEvent>, WatchError>> {
-  const wire = encode(WatchPayload2, payload);
+  const wire = encode(WatchPayload2, payload ?? {});
   if (!wire.ok) {
     return wire;
   }

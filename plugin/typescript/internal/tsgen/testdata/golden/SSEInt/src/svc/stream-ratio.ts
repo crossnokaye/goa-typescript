@@ -47,9 +47,10 @@ export type StreamRatioError =
  */
 export async function streamRatio(
   client: Client,
+  payload?: undefined,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<StreamRatioEvent>, StreamRatioError>> {
-  const sent = await send(client, streamRatioSpec, undefined, options);
+  const sent = await send(client, streamRatioSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

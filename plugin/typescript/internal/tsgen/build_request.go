@@ -181,6 +181,7 @@ func (b *builder) buildRequest(e *expr.HTTPEndpointExpr, strip map[string]struct
 	}
 	req.TSDef = c.objectTS(fields, "")
 	req.Zod, _ = c.objectZod(fields, "")
+	req.Optional = req.Body.Kind != BodyRaw && allOptional(fields)
 	return req, nil
 }
 
@@ -193,4 +194,15 @@ func shape(att *expr.AttributeExpr) string {
 		return "map"
 	}
 	return "scalar"
+}
+
+// allOptional reports whether every field may be absent, so that an empty
+// object is a valid value.
+func allOptional(fields []field) bool {
+	for _, f := range fields {
+		if !f.optional {
+			return false
+		}
+	}
+	return true
 }

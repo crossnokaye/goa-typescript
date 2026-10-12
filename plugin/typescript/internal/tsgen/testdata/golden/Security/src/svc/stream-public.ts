@@ -50,9 +50,10 @@ export type StreamPublicError =
  */
 export async function streamPublic(
   client: Client,
+  payload?: undefined,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<StreamPublicEvent>, StreamPublicError>> {
-  const sent = await send(client, streamPublicSpec, undefined, options);
+  const sent = await send(client, streamPublicSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

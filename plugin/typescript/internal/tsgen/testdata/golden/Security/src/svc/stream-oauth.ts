@@ -52,9 +52,10 @@ export type StreamOauthError =
  */
 export async function streamOauth(
   client: Client,
+  payload?: undefined,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<StreamOauthEvent>, StreamOauthError>> {
-  const sent = await send(client, streamOauthSpec, undefined, options);
+  const sent = await send(client, streamOauthSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

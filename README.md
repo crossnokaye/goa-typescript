@@ -5,7 +5,7 @@
 - **`plugin/typescript/`**: a Goa v3 codegen plugin that generates a TypeScript client into `gen/ts`, straight from the design expressions (no OpenAPI step).
 - **`runtime/`**: the small TypeScript runtime that the plugin copies into every generated client (fetch client, response decoding, typed goa errors, Zod codecs, Server-Sent Events).
 
-The generated client is functional (`fn(client, payload, options?)`), returns `Result` values instead of throwing, types goa errors by name, and pairs every design type with a [Zod 4](https://zod.dev) schema of the same name.
+The generated client is functional (`fn(client, payload?, options?)`), returns `Result` values instead of throwing, types goa errors by name, and pairs every design type with a [Zod 4](https://zod.dev) schema of the same name.
 
 **Status:** REST and Server-Sent Events endpoints are generated today. Types and schemas are generated for every HTTP endpoint; functions for WebSocket endpoints are on the [roadmap](#roadmap).
 
@@ -104,9 +104,19 @@ Methods declared with `NoSecurity()` never receive a credential.
 
 **Per-call options** are the last argument of every function: `signal`, `headers`, `timeoutMs`, `baseURL`, and any other `RequestInit` field (`cache`, `credentials`, ...).
 
+**One call shape.** Every function is `fn(client, payload?, options?)`, whatever the method declares ([ADR 0003](docs/adr/0003-one-call-shape.md)). The payload is always the second argument:
+
+| Design | `payload` |
+|---|---|
+| a `Payload` with a required attribute (credentials do not count: they come from the client's `auth`) | required |
+| a `Payload` whose attributes are all optional or have a `Default` | optional; `fn(client)` sends an empty payload |
+| no `Payload`, or nothing left of it once credentials are stripped | `undefined`; `fn(client)` or, to pass options, `fn(client, undefined, { signal })` |
+
+So a wrapper typed `(client, payload, options?) => Promise<CallResult<Res, EndpointError>>` accepts every function, and adding the first optional attribute to a method does not change how its callers look. Passing options to a payload-less method takes an `undefined` placeholder; passing them where the payload goes is a compile error rather than a silently misread request. The one exception is a [raw upload](#rest-methods) without a payload: `body` follows `payload`, and an optional parameter cannot precede a required one, so `payload` is a required `undefined` there.
+
 ### REST methods
 
-A method without streaming becomes a function that resolves to the method's result:
+A method without streaming becomes a function `fn(client, payload?, options?)` that resolves to the method's result:
 
 ```ts
 import { toy } from "toy-client";
@@ -118,6 +128,9 @@ if (!result.ok) {
 result.value;                        // ThingReply: decoded and validated, dates already Date objects
 result.response.status;              // the fetch Response, for the status and the headers
 result.response.headers.get("etag");
+
+await toy.getThingViewed(client);                      // every attribute is optional: the payload may be omitted
+await toy.listThings(client, undefined, { signal });   // no payload: undefined holds its place
 ```
 
 **The value is the bare goa type.** There is no `{ data }` envelope: what the design calls the `Result` is what `result.value` is, and what `unwrapAsync` returns. Transport metadata rides beside it, on `result.response` ([ADR 0002](docs/adr/0002-response-metadata-beside-the-value.md)). On a failure `result.response` is set whenever a response arrived (a goa error, an unexpected response, a response that fails validation) and absent otherwise (network failure, abort, timeout, a request that fails validation).
@@ -156,11 +169,13 @@ if (result.ok) {
 }
 ```
 
-**Raw upload** (`SkipRequestBodyEncodeDecode`). The function takes the body after the payload, or in its place when the method has none, and hands it to `fetch` as is:
+**Raw upload** (`SkipRequestBodyEncodeDecode`). The function takes the body after the payload and hands it to `fetch` as is:
 
 ```ts
 await toy.uploadThing(client, { id, content_type: file.type }, file);
 ```
+
+When the method has no payload the function still takes one, typed `undefined`, so that `body` stays in its place: `upload(client, undefined, file)`. The same holds for a raw upload whose payload attributes are all optional: `payload` stays required there, because TypeScript does not allow an optional parameter before a required one.
 
 A `Blob` (so a `File`), an `ArrayBuffer`, `FormData` and a string work everywhere. A `ReadableStream` is sent with `duplex: "half"`, which Safari and Firefox do not support. No `Content-Type` is set unless the design maps a payload attribute to that header; `fetch` derives one from a `Blob` or a string.
 
@@ -178,7 +193,7 @@ Things worth knowing:
 
 ### Streaming methods (SSE)
 
-A method with `StreamingResult` and `ServerSentEvents()` becomes a function that resolves to an async-iterable `EventStream`:
+A method with `StreamingResult` and `ServerSentEvents()` becomes a function `fn(client, payload?, options?)`, shaped like a [REST function](#rest-methods), that resolves to an async-iterable `EventStream`:
 
 ```ts
 import { toy } from "toy-client";
@@ -278,7 +293,16 @@ type CallResult<T, E> =
 
 `unwrap(result)` and `unwrapAsync(promise)` turn a failure back into an exception when that is more convenient (inside a TanStack Query `queryFn`, for instance). They return the bare value.
 
-Every function exports its own error union. Every member has a string `kind`:
+Every function exports its own error union. `EndpointError` is the type every union is assignable to, for code that handles errors from more than one endpoint:
+
+```ts
+import type { EndpointError } from "toy-client";
+
+type QueryOptions<T> = UseQueryOptions<T, EndpointError>;
+function toast(e: EndpointError) { /* ... */ }
+```
+
+Every member has a string `kind`:
 
 | `kind` | Class | Meaning |
 |---|---|---|

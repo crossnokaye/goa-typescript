@@ -42,9 +42,10 @@ export type WatchError =
  */
 export async function watch(
   client: Client,
+  payload?: undefined,
   options?: StreamOptions,
 ): Promise<CallResult<EventStream<Optional>, WatchError>> {
-  const sent = await send(client, watchSpec, undefined, options);
+  const sent = await send(client, watchSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

@@ -57,9 +57,10 @@ export type GetPageError =
  */
 export async function getPage(
   client: Client,
+  payload?: undefined,
   options?: RequestOptions,
 ): Promise<CallResult<Page, GetPageError>> {
-  const sent = await send(client, getPageSpec, undefined, options);
+  const sent = await send(client, getPageSpec, payload, options);
   if (!sent.ok) {
     return sent;
   }

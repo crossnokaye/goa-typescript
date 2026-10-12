@@ -162,9 +162,26 @@ export type ClientError =
   | ResponseValidationError
   | UnexpectedResponseError;
 
-/** isGoaError reports whether e is an error returned by a goa service. */
-export function isGoaError(e: unknown): e is GoaError<string, unknown> {
-  return e instanceof GoaError;
+/**
+ * isGoaError reports whether e is an error returned by a goa service and, when
+ * a name is given, whether it is the error of that name.
+ *
+ * With a name, and with e typed as the error union of an endpoint
+ * (`result.error`), e narrows to the member the design declares under that
+ * name, so `e.detail` has the type of the error. Comparing `e.name` does not
+ * narrow that far: an undeclared error can carry any name.
+ *
+ * In a `catch` block e is `unknown` and there is no union to pick from: e
+ * narrows to `GoaError<N, unknown>` and `detail` stays `unknown`.
+ */
+export function isGoaError(e: unknown): e is GoaError<string, unknown>;
+export function isGoaError<E extends { readonly kind: string } | undefined, N extends string>(
+  e: E,
+  name: N,
+): e is Extract<E, { readonly kind: "goa"; readonly name: N }>;
+export function isGoaError<N extends string>(e: unknown, name: N): e is GoaError<N, unknown>;
+export function isGoaError(e: unknown, name?: string): boolean {
+  return e instanceof GoaError && (name === undefined || e.name === name);
 }
 
 /** errorMessage returns a display string for anything a generated function can fail with. */

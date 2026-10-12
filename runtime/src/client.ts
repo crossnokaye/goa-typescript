@@ -65,11 +65,16 @@ export interface StreamOptions extends RequestOptions {
   lastEventId?: string | undefined;
 }
 
-/** EndpointBody says which part of the encoded request becomes the JSON body. */
+/**
+ * EndpointBody says which part of the encoded request becomes the JSON body.
+ * A "raw" body is not part of the request at all: the caller hands it to
+ * `send`, which passes it to fetch untouched.
+ */
 export type EndpointBody =
   | { kind: "fields"; fields: readonly string[] }
   | { kind: "attr"; attr: string }
-  | { kind: "whole" };
+  | { kind: "whole" }
+  | { kind: "raw" };
 
 /** EndpointSpec is the transport mapping of one goa HTTP endpoint. */
 export interface EndpointSpec {
@@ -93,12 +98,19 @@ export interface EndpointSpec {
  * send performs one HTTP exchange for an endpoint. `wire` is the request after
  * schema encoding. It resolves once response headers arrive; reading the body
  * is left to the caller.
+ *
+ * `rawBody` is the body of an endpoint whose spec says `body: { kind: "raw" }`.
+ * No `Content-Type` is set for it unless a header parameter or the caller
+ * does; fetch derives one from a `Blob`, `FormData` or string. A
+ * `ReadableStream` is sent with `duplex: "half"`, which Safari and Firefox do
+ * not support.
  */
 export async function send(
   client: Client,
   spec: EndpointSpec,
   wire: unknown,
   options?: StreamOptions,
+  rawBody?: BodyInit | null,
 ): Promise<Result<Response, TransportError>> {
   const {
     signal: callerSignal,
@@ -140,8 +152,10 @@ export async function send(
     headers.set("Last-Event-ID", lastEventId);
   }
 
-  let body: string | undefined;
-  if (spec.body) {
+  let body: BodyInit | undefined;
+  if (spec.body?.kind === "raw") {
+    body = rawBody ?? undefined;
+  } else if (spec.body) {
     let value: unknown;
     switch (spec.body.kind) {
       case "fields": {
@@ -200,6 +214,10 @@ export async function send(
   }
   if (body !== undefined) {
     requestInit.body = body;
+    if (typeof ReadableStream !== "undefined" && body instanceof ReadableStream) {
+      // Required to send a stream; missing from older DOM typings.
+      (requestInit as RequestInit & { duplex?: "half" }).duplex = "half";
+    }
   }
   if (signal) {
     requestInit.signal = signal;

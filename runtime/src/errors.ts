@@ -163,6 +163,13 @@ export type ClientError =
   | UnexpectedResponseError;
 
 /**
+ * EndpointError is the error type of any generated function: every function's
+ * error union narrows to it. Use it for code that handles errors from more than
+ * one endpoint, such as a shared query-options alias or a toast formatter.
+ */
+export type EndpointError = GoaError<string, unknown> | ClientError;
+
+/**
  * isGoaError reports whether e is an error returned by a goa service and, when
  * a name is given, whether it is the error of that name.
  *

@@ -73,18 +73,30 @@ func main() {
 	}
 }
 
-type authorizationSeenKey struct{}
+type requestHeadersKey struct{}
+
+// requestHeaders is what the service methods report about the raw request.
+type requestHeaders struct {
+	authorization bool
+	accept        string
+}
 
 // recordAuthorization notes whether a request carried an Authorization
-// header, which stream_public_sse reports back.
+// header, which stream_public_sse reports back, and its Accept header, which
+// stream_or_list checks.
 func recordAuthorization(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		seen := r.Header.Get("Authorization") != ""
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), authorizationSeenKey{}, seen)))
+		seen := requestHeaders{authorization: r.Header.Get("Authorization") != "", accept: r.Header.Get("Accept")}
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), requestHeadersKey{}, seen)))
 	})
 }
 
 func authorizationSeen(ctx context.Context) bool {
-	seen, _ := ctx.Value(authorizationSeenKey{}).(bool)
-	return seen
+	seen, _ := ctx.Value(requestHeadersKey{}).(requestHeaders)
+	return seen.authorization
+}
+
+func acceptSeen(ctx context.Context) string {
+	seen, _ := ctx.Value(requestHeadersKey{}).(requestHeaders)
+	return seen.accept
 }

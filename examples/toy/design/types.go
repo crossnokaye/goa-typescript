@@ -118,3 +118,55 @@ var ThingFilter = Type("ThingFilter", func() {
 		Format(FormatDateTime)
 	})
 })
+
+var ThingReply = Type("ThingReply", func() {
+	Description("A thing, with what the server saw of the request that asked for it.")
+	Attribute("thing", Thing)
+	Attribute("etag", String, "Travels in the ETag response header")
+	Attribute("tags", ArrayOf(String), "The tag query parameters")
+	Attribute("verbose", Boolean, "The verbose query parameter")
+	Attribute("since", String, "The since query parameter", func() {
+		Format(FormatDateTime)
+	})
+	Attribute("trace", String, "The X-Trace-Id request header")
+	Required("thing", "etag")
+})
+
+var UpsertResult = Type("UpsertResult", func() {
+	Description("The thing after an upsert. The outcome is not in the body: the status code carries it.")
+	Attribute("thing", Thing)
+	Attribute("outcome", String, func() {
+		Enum("updated", "created")
+	})
+	Required("thing")
+})
+
+var ValidationProblem = Type("ValidationProblem", func() {
+	Description("Why a thing was rejected.")
+	Attribute("field", String)
+	Attribute("message", String)
+	Attribute("retry_after", Int, "Seconds to wait, sent in the Retry-After header")
+	Required("field", "message")
+})
+
+// ThingMatch is only used as the body of find_thing: goa's Go generator cannot
+// name the body type of Body("attribute") when the attribute's type is also
+// nested in another response of the service.
+var ThingMatch = Type("ThingMatch", func() {
+	Description("What find_thing found.")
+	Attribute("id", String)
+	Attribute("name", String)
+	Attribute("found_at", String, func() {
+		Format(FormatDateTime)
+	})
+	Required("id", "name")
+})
+
+var ThingSummary = Type("ThingSummary", func() {
+	Description("The short form of a thing that stream_or_list returns.")
+	Attribute("id", String)
+	Attribute("created_at", String, func() {
+		Format(FormatDateTime)
+	})
+	Required("id")
+})

@@ -3,7 +3,7 @@ package design
 import . "goa.design/goa/v3/dsl"
 
 var _ = Service("toy", func() {
-	Description("Toy service with one Server-Sent Events method per feature.")
+	Description("Toy service with one method per feature of the generated client.")
 
 	Error("not_found")
 	Error("unauthorized")
@@ -135,6 +135,217 @@ var _ = Service("toy", func() {
 			GET("/keyed")
 			Param("key")
 			ServerSentEvents()
+		})
+	})
+
+	Method("get_thing", func() {
+		Description("Returns a thing and echoes the request. The id \"missing\" fails with not_found.")
+		PayloadWithToken(func() {
+			Attribute("id", String, "Thing identifier")
+			Attribute("tags", ArrayOf(String), "Sent as repeated tag parameters")
+			Attribute("verbose", Boolean)
+			Attribute("since", String, func() {
+				Format(FormatDateTime)
+			})
+			Attribute("trace", String, "Sent in the X-Trace-Id header")
+			Required("id")
+		})
+		Result(ThingReply)
+		HTTP(func() {
+			GET("/things/{id}")
+			Param("tags:tag")
+			Param("verbose")
+			Param("since")
+			Header("trace:X-Trace-Id")
+			Response(StatusOK, func() {
+				Header("etag:ETag")
+			})
+		})
+	})
+
+	Method("get_thing_viewed", func() {
+		Description("Returns a result type rendered with the requested view.")
+		PayloadWithToken(func() {
+			Attribute("view", String, "View to render", func() {
+				Enum("default", "extended")
+				Default("default")
+			})
+		})
+		Result(ThingWithViews)
+		HTTP(func() {
+			GET("/viewed/thing")
+			Param("view")
+		})
+	})
+
+	Method("list_things", func() {
+		Description("Returns a collection of two things in the default view.")
+		PayloadWithToken(nil)
+		Result(CollectionOf(ThingWithViews))
+		HTTP(func() {
+			GET("/things")
+		})
+	})
+
+	Method("create_thing", func() {
+		Description("Creates a thing. The name \"bad\" fails with invalid, the name \"taken\" with conflict.")
+		PayloadWithToken(func() {
+			Attribute("name", String)
+			Attribute("kind", String, func() {
+				Enum("widget", "gadget")
+				Default("widget")
+			})
+			Required("name")
+		})
+		Result(Thing)
+		Error("invalid", ValidationProblem)
+		Error("conflict", func() {
+			Description("An error type the design does not name.")
+			Attribute("existing_id", String)
+			Attribute("since", String, func() {
+				Format(FormatDateTime)
+			})
+			Required("existing_id")
+		})
+		HTTP(func() {
+			POST("/things")
+			Response(StatusCreated)
+			Response("invalid", StatusUnprocessableEntity, func() {
+				Header("retry_after:Retry-After")
+			})
+			Response("conflict", StatusConflict)
+		})
+	})
+
+	Method("upsert_thing", func() {
+		Description("Updates a thing, or creates it when the id is \"new\". The status code tells which.")
+		PayloadWithToken(func() {
+			Attribute("id", String)
+			Attribute("name", String)
+			Required("id", "name")
+		})
+		Result(UpsertResult)
+		HTTP(func() {
+			PUT("/things/{id}")
+			Response(StatusOK)
+			Response(StatusCreated, func() {
+				Tag("outcome", "created")
+			})
+		})
+	})
+
+	Method("find_thing", func() {
+		Description("Answers 200 with the match as the body, or 204 when the name is \"nothing\".")
+		PayloadWithToken(func() {
+			Attribute("name", String)
+			Required("name")
+		})
+		Result(func() {
+			Attribute("match", ThingMatch)
+			Attribute("found", String)
+		})
+		HTTP(func() {
+			GET("/find")
+			Param("name")
+			Response(StatusNoContent, func() {
+				Body(Empty)
+			})
+			Response(StatusOK, func() {
+				Tag("found", "yes")
+				Body("match")
+			})
+		})
+	})
+
+	Method("delete_thing", func() {
+		Description("Deletes a thing. The id \"missing\" fails with not_found.")
+		PayloadWithToken(func() {
+			Attribute("id", String)
+			Required("id")
+		})
+		HTTP(func() {
+			DELETE("/things/{id}")
+			Response(StatusNoContent)
+		})
+	})
+
+	Method("download_thing", func() {
+		Description("Streams the content of a thing; the client does not decode the body.")
+		PayloadWithToken(func() {
+			Attribute("id", String)
+			Required("id")
+		})
+		Result(func() {
+			Attribute("content_length", Int64)
+			Attribute("content_type", String)
+			Required("content_length", "content_type")
+		})
+		HTTP(func() {
+			GET("/things/{id}/content")
+			SkipResponseBodyEncodeDecode()
+			Response(StatusOK, func() {
+				Header("content_length:Content-Length")
+				Header("content_type:Content-Type")
+			})
+		})
+	})
+
+	Method("upload_thing", func() {
+		Description("Receives the content of a thing; the client does not encode the body.")
+		PayloadWithToken(func() {
+			Attribute("id", String)
+			Attribute("content_type", String)
+			Required("id")
+		})
+		Result(func() {
+			Attribute("size", Int, "Number of bytes received")
+			Attribute("content_type", String, "The Content-Type the server saw")
+			Attribute("text", String, "The bytes received, as text")
+			Required("size", "text")
+		})
+		HTTP(func() {
+			PUT("/things/{id}/content")
+			Header("content_type:Content-Type")
+			SkipRequestBodyEncodeDecode()
+		})
+	})
+
+	Method("stream_or_list", func() {
+		Description("Offers the same things as one response or as a stream, depending on the Accept header.")
+		PayloadWithToken(func() {
+			Attribute("empty", Boolean, "Return no things: a nil slice, which Go encodes as null")
+		})
+		// Not Thing: goa's server for a mixed method does not import the
+		// package of a type that lives outside the service package.
+		Result(ArrayOf(ThingSummary))
+		StreamingResult(ThingSummary)
+		HTTP(func() {
+			GET("/stream-or-list")
+			Param("empty")
+			ServerSentEvents()
+		})
+	})
+
+	Method("thing_count", func() {
+		Description("A primitive result, and an error that is a plain string.")
+		PayloadWithToken(func() {
+			Attribute("fail", Boolean)
+		})
+		Result(Int)
+		Error("teapot", String)
+		HTTP(func() {
+			GET("/thing-count")
+			Param("fail")
+			Response("teapot", StatusTeapot)
+		})
+	})
+
+	Method("thing_blob", func() {
+		Description("A result made of bytes.")
+		PayloadWithToken(nil)
+		Result(Bytes)
+		HTTP(func() {
+			GET("/thing-blob")
 		})
 	})
 })

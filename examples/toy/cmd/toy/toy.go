@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"time"
 
@@ -178,4 +180,124 @@ func (s *toyService) StreamPublicSse(ctx context.Context, stream toy.StreamPubli
 
 func (s *toyService) StreamKeyedSse(ctx context.Context, _ *toy.StreamKeyedSsePayload, stream toy.StreamKeyedSseServerStream) error {
 	return stream.SendWithContext(ctx, &types.ThingEvent{Type: "keyed", ID: "keyed-1"})
+}
+
+func (s *toyService) GetThing(_ context.Context, p *toy.GetThingPayload) (*toy.ThingReply, error) {
+	if p.ID == "missing" {
+		return nil, toy.MakeNotFound(fmt.Errorf("thing %q not found", p.ID))
+	}
+	return &toy.ThingReply{
+		Thing:   fullThing(),
+		Etag:    `"` + p.ID + `-v1"`,
+		Tags:    p.Tags,
+		Verbose: p.Verbose,
+		Since:   p.Since,
+		Trace:   p.Trace,
+	}, nil
+}
+
+func (s *toyService) GetThingViewed(_ context.Context, p *toy.GetThingViewedPayload) (*toy.ThingWithViews, string, error) {
+	return &toy.ThingWithViews{ID: "viewed", Name: "viewed-thing", Secret: "s3cr3t"}, p.View, nil
+}
+
+func (s *toyService) ListThings(context.Context, *toy.ListThingsPayload) (toy.ThingWithViewsCollection, string, error) {
+	return toy.ThingWithViewsCollection{
+		{ID: "one", Name: "first", Secret: "s3cr3t"},
+		{ID: "two", Name: "second", Secret: "s3cr3t"},
+	}, "default", nil
+}
+
+func (s *toyService) CreateThing(_ context.Context, p *toy.CreateThingPayload) (*types.Thing, error) {
+	switch p.Name {
+	case "bad":
+		return nil, &toy.ValidationProblem{Field: "name", Message: "bad is not a good name", RetryAfter: ptr(30)}
+	case "taken":
+		return nil, &toy.Conflict{ExistingID: fullThingID, Since: ptr("2026-01-02T03:04:05Z")}
+	}
+	thing := minimalThing(minimalThingID)
+	thing.Name = ptr(p.Name)
+	thing.Kind = p.Kind
+	return thing, nil
+}
+
+func (s *toyService) UpsertThing(_ context.Context, p *toy.UpsertThingPayload) (*toy.UpsertResult, error) {
+	thing := minimalThing(minimalThingID)
+	thing.Name = ptr(p.Name)
+	if p.ID == "new" {
+		// The tag selects the 201 response, which leaves the outcome out of the body.
+		return &toy.UpsertResult{Thing: thing, Outcome: ptr("created")}, nil
+	}
+	return &toy.UpsertResult{Thing: thing, Outcome: ptr("updated")}, nil
+}
+
+func (s *toyService) FindThing(_ context.Context, p *toy.FindThingPayload) (*toy.FindThingResult, error) {
+	if p.Name == "nothing" {
+		// No tag: the untagged 204 response is used.
+		return &toy.FindThingResult{}, nil
+	}
+	return &toy.FindThingResult{
+		Match: &toy.ThingMatch{ID: fullThingID, Name: p.Name, FoundAt: ptr("2026-01-02T03:04:05Z")},
+		Found: ptr("yes"),
+	}, nil
+}
+
+func (s *toyService) DeleteThing(_ context.Context, p *toy.DeleteThingPayload) error {
+	if p.ID == "missing" {
+		return toy.MakeNotFound(fmt.Errorf("thing %q not found", p.ID))
+	}
+	return nil
+}
+
+func (s *toyService) DownloadThing(_ context.Context, p *toy.DownloadThingPayload) (*toy.DownloadThingResult, io.ReadCloser, error) {
+	if p.ID == "missing" {
+		return nil, nil, toy.MakeNotFound(fmt.Errorf("thing %q not found", p.ID))
+	}
+	// Not text: the client must hand the bytes over untouched.
+	content := append([]byte{0x00, 0xff}, []byte("content of "+p.ID)...)
+	return &toy.DownloadThingResult{
+		ContentLength: int64(len(content)),
+		ContentType:   "application/octet-stream",
+	}, io.NopCloser(bytes.NewReader(content)), nil
+}
+
+func (s *toyService) UploadThing(_ context.Context, p *toy.UploadThingPayload, body io.ReadCloser) (*toy.UploadThingResult, error) {
+	defer body.Close()
+	content, err := io.ReadAll(body)
+	if err != nil {
+		return nil, err
+	}
+	return &toy.UploadThingResult{Size: len(content), ContentType: p.ContentType, Text: string(content)}, nil
+}
+
+func (s *toyService) StreamOrList(ctx context.Context, p *toy.StreamOrListPayload, stream toy.StreamOrListServerStream) ([]*toy.ThingSummary, error) {
+	// goa streams when Accept names text/event-stream and answers with the
+	// result otherwise. The generated client must ask for one or the other.
+	if accept := acceptSeen(ctx); accept != "application/json" && accept != "text/event-stream" {
+		return nil, toy.MakePreconditionFailed(fmt.Errorf("unexpected Accept header %q", accept))
+	}
+	if p.Empty != nil && *p.Empty {
+		return nil, nil
+	}
+	things := []*toy.ThingSummary{
+		{ID: "one", CreatedAt: ptr("2026-01-02T03:04:05Z")},
+		{ID: "two"},
+	}
+	for _, thing := range things {
+		// In the plain mode goa hands over a stream that discards events.
+		if err := stream.SendWithContext(ctx, thing); err != nil {
+			return nil, err
+		}
+	}
+	return things, nil
+}
+
+func (s *toyService) ThingCount(_ context.Context, p *toy.ThingCountPayload) (int, error) {
+	if p.Fail != nil && *p.Fail {
+		return 0, toy.Teapot("short and stout")
+	}
+	return 3, nil
+}
+
+func (s *toyService) ThingBlob(context.Context, *toy.ThingBlobPayload) ([]byte, error) {
+	return []byte{0x00, 0xff, 'h', 'i'}, nil
 }

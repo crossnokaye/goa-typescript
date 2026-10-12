@@ -65,7 +65,6 @@ The UIs use a small slice of what Speakeasy emits: standalone functions `(core, 
 
 ## References
 
-- `docs/plan.md`: the implementation plan this ADR summarizes.
 - Goa's SSE wire format: `http/codegen/templates/server_sse.go.tpl` and `partial/sse_format.go.tpl` in `goa.design/goa/v3`.
 - Goa's design immutability check: `codegen/generator/lifecycle.go` (`verifyPreparedDesign`).
 - First consumers: hyperion's `ui/src/queries/operations/stream-facility-group-operations.ts` and `ui/src/features/insights/queries/stream-facility-group-insights.ts`.

@@ -162,6 +162,11 @@ export type DeclaredGoaError<T extends ErrorTable> = {
  * goaErrorDecoder turns a non-success response into a typed error. The goa
  * error name is taken from the `goa-error` header, then the body, then the
  * table when the status declares a single error.
+ *
+ * A response that goa did not produce (no `goa-error` header and a body that
+ * is not a goa error) is an `UnexpectedResponseError`, even when its status is
+ * one the design declares: a proxy or middleware in front of the service may
+ * have answered.
  */
 export function goaErrorDecoder<const T extends ErrorTable>(
   table: T,
@@ -186,10 +191,8 @@ export function goaErrorDecoder<const T extends ErrorTable>(
     }
     const goa = parsed ? asErrorResult(body) : undefined;
     const entries = table[response.status] ?? [];
-    const name =
-      response.headers.get("goa-error") ??
-      goa?.name ??
-      (entries.length === 1 ? entries[0]!.name : undefined);
+    const header = response.headers.get("goa-error");
+    const name = header ?? goa?.name ?? (entries.length === 1 ? entries[0]!.name : undefined);
     const entry = name === undefined ? undefined : entries.find((e) => e.name === name);
 
     if (entry?.schema) {
@@ -216,6 +219,12 @@ export function goaErrorDecoder<const T extends ErrorTable>(
         response,
         detail: undefined,
       }) as Out;
+    }
+    if (entry && header === entry.name) {
+      // goa named a declared error whose body is neither its default error
+      // nor a type this client has a schema for.
+      const message = isRecordWithMessage(body) ? body.message : `${entry.name}: HTTP ${response.status}`;
+      return new GoaError({ name: entry.name, message, body, response, detail: undefined }) as Out;
     }
     return new UnexpectedResponseError(response, text);
   };

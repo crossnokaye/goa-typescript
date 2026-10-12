@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"goa.design/goa/v3/codegen"
+	"goa.design/goa/v3/eval"
 	"goa.design/goa/v3/expr"
 
 	"github.com/xeger/goa-typescript/plugin/typescript/internal/tsgen/testdata"
@@ -49,11 +50,22 @@ var fixtures = []struct {
 	{"TwoServices", testdata.TwoServicesDSL},
 }
 
+// design evaluates a DSL the way `goa gen` hands it to plugins: evaluated,
+// then normalized, which wraps every inline method payload and result in a
+// user type that goa generates.
+func design(t *testing.T, dsl func()) *expr.RootExpr {
+	t.Helper()
+	root := codegen.RunDSL(t, dsl)
+	if _, err := codegen.NewGeneration("example.com/toy/gen", []eval.Root{root}); err != nil {
+		t.Fatalf("NewGeneration: %v", err)
+	}
+	return root
+}
+
 // build evaluates a DSL and builds its package description.
 func build(t *testing.T, dsl func()) *PackageSpec {
 	t.Helper()
-	root := codegen.RunDSL(t, dsl)
-	pkg, err := Build([]*expr.RootExpr{root}, Options{Runtime: tsruntime.Sorted()})
+	pkg, err := Build([]*expr.RootExpr{design(t, dsl)}, Options{Runtime: tsruntime.Sorted()})
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
@@ -211,6 +223,30 @@ func TestRenderIsDeterministic(t *testing.T) {
 			for rel, content := range first {
 				if second[rel] != content {
 					t.Errorf("%s differs between runs:\n%s", rel, unifiedDiff(content, second[rel]))
+				}
+			}
+		})
+	}
+}
+
+// TestRenderIgnoresNormalization renders every fixture from the design as
+// evaluated and from the design as `goa gen` normalizes it. The wrappers goa
+// adds around inline payloads and results must not show in the output.
+func TestRenderIgnoresNormalization(t *testing.T) {
+	for _, fx := range fixtures {
+		t.Run(fx.Name, func(t *testing.T) {
+			raw, err := Build([]*expr.RootExpr{codegen.RunDSL(t, fx.DSL)}, Options{Runtime: tsruntime.Sorted()})
+			if err != nil {
+				t.Fatalf("Build: %v", err)
+			}
+			evaluated := renderTo(t, raw, t.TempDir())
+			normalized := renderTo(t, build(t, fx.DSL), t.TempDir())
+			if len(evaluated) != len(normalized) {
+				t.Fatalf("file sets differ: %v then %v", sortedKeys(evaluated), sortedKeys(normalized))
+			}
+			for _, rel := range sortedKeys(evaluated) {
+				if evaluated[rel] != normalized[rel] {
+					t.Errorf("%s depends on normalization:\n%s", rel, unifiedDiff(evaluated[rel], normalized[rel]))
 				}
 			}
 		})

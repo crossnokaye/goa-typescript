@@ -11,18 +11,6 @@ export const Circle = z.object({
   radius: z.number(),
 }) satisfies z.ZodType<Circle>;
 
-export type PaymentCash = number;
-export const PaymentCash = z.int() satisfies z.ZodType<PaymentCash>;
-
-export type PaymentPoints = number[];
-export const PaymentPoints = z.array(z.int()) satisfies z.ZodType<PaymentPoints>;
-
-export type ShapeDrawnAt = Date;
-export const ShapeDrawnAt = dateTime() satisfies z.ZodType<ShapeDrawnAt>;
-
-export type ShapeLabel = string;
-export const ShapeLabel = z.string() satisfies z.ZodType<ShapeLabel>;
-
 export type Square = {
   side: number;
 };
@@ -34,22 +22,22 @@ export type Drawing = {
   shape:
     | { type: "circle"; value: Circle }
     | { type: "square"; value: Square }
-    | { type: "label"; value: ShapeLabel }
-    | { type: "drawn_at"; value: ShapeDrawnAt };
+    | { type: "label"; value: string }
+    | { type: "drawn_at"; value: Date };
   payment?:
-    | { kind: "cash"; details: PaymentCash }
-    | { kind: "points"; details: PaymentPoints }
+    | { kind: "cash"; details: number }
+    | { kind: "points"; details: number[] }
     | undefined;
 };
 export const Drawing = z.object({
   shape: z.discriminatedUnion("type", [
     z.object({ type: z.literal("circle"), value: Circle }),
     z.object({ type: z.literal("square"), value: Square }),
-    z.object({ type: z.literal("label"), value: ShapeLabel }),
-    z.object({ type: z.literal("drawn_at"), value: ShapeDrawnAt }),
+    z.object({ type: z.literal("label"), value: z.string() }),
+    z.object({ type: z.literal("drawn_at"), value: dateTime() }),
   ]),
   payment: z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("cash"), details: PaymentCash }),
-    z.object({ kind: z.literal("points"), details: PaymentPoints }),
+    z.object({ kind: z.literal("cash"), details: z.int() }),
+    z.object({ kind: z.literal("points"), details: z.array(z.int()) }),
   ]).optional(),
 }) satisfies z.ZodType<Drawing>;

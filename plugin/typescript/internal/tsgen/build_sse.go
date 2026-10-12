@@ -14,7 +14,7 @@ func (b *builder) buildSSE(e *expr.HTTPEndpointExpr, inlineName string, refs *re
 	}
 	spec := &SSESpec{RequestIDField: e.SSE.RequestIDField}
 
-	if _, ok := hoistable(event.Type); ok {
+	if _, ok := b.mapper.hoist(event.Type); ok {
 		// The schema is used as a value, so the reference registers the import.
 		spec.EventTypeName = c.zod(event, "", false).code
 	} else {

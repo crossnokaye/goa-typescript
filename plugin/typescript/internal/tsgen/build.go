@@ -68,7 +68,7 @@ func Build(roots []*expr.RootExpr, opts Options) (*PackageSpec, error) {
 	}
 	sort.Slice(services, func(i, j int) bool { return services[i].http.Name() < services[j].http.Name() })
 
-	b := &builder{mapper: newTypeMapper()}
+	b := &builder{mapper: newTypeMapper(roots...)}
 	b.reserved = append(append([]string(nil), reservedGlobals...), runtimeExports(pkg.Runtime)...)
 
 	// Hoist every user type that an HTTP endpoint can carry, including the
@@ -299,7 +299,7 @@ func (b *builder) buildErrors(e *expr.HTTPEndpointExpr, ep *EndpointSpec, refs *
 			Timeout:   hasMeta(att, "goa:error:timeout"),
 			Fault:     hasMeta(att, "goa:error:fault"),
 		}
-		if _, ok := hoistable(att.Type); ok && expr.IsObject(att.Type) {
+		if _, ok := b.mapper.hoist(att.Type); ok && expr.IsObject(att.Type) {
 			spec.TypeName = c.tsType(att, "", false)
 		}
 		ep.Errors = append(ep.Errors, spec)

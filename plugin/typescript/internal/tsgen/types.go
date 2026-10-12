@@ -18,13 +18,30 @@ type typeMapper struct {
 	origins []expr.UserType
 	// recursive holds the hoisted types that take part in a reference cycle.
 	recursive map[expr.UserType]bool
+	// authored holds the user types the design declares with Type or
+	// ResultType. Only those are hoisted.
+	authored map[expr.UserType]struct{}
 }
 
-func newTypeMapper() *typeMapper {
-	return &typeMapper{
+// newTypeMapper returns a mapper that hoists the types declared by the roots.
+func newTypeMapper(roots ...*expr.RootExpr) *typeMapper {
+	m := &typeMapper{
 		names:     make(map[expr.UserType]string),
 		recursive: make(map[expr.UserType]bool),
+		authored:  make(map[expr.UserType]struct{}),
 	}
+	for _, root := range roots {
+		if root == nil {
+			continue
+		}
+		for _, ut := range root.Types {
+			m.authored[ut.Origin()] = struct{}{}
+		}
+		for _, ut := range root.ResultTypes {
+			m.authored[ut.Origin()] = struct{}{}
+		}
+	}
+	return m
 }
 
 // refs records what a rendered snippet needs imported.
@@ -65,14 +82,25 @@ func (r *refs) imports() Imports {
 	return imp
 }
 
-// hoistable reports whether t is a user type that gets its own declaration.
-// The empty type and goa's default error type do not: the runtime models them.
-func hoistable(t expr.DataType) (expr.UserType, bool) {
+// hoist reports whether t is a user type that gets its own declaration, and
+// returns the declaration it stands for.
+//
+// Only types the design names qualify. goa also creates user types of its
+// own: wrappers around inline method payloads and results (during `goa gen`,
+// before plugins run), around primitive union branches and around
+// CollectionOf results. Their names are artifacts of the Go generator, so
+// they are rendered inline like the anonymous types they stand for. The empty
+// type and goa's default error type are modelled by the runtime.
+func (m *typeMapper) hoist(t expr.DataType) (expr.UserType, bool) {
 	ut, ok := t.(expr.UserType)
 	if !ok || ut == expr.Empty || expr.IsErrorResult(ut) {
 		return nil, false
 	}
-	return ut.Origin(), true
+	origin := ut.Origin()
+	if _, authored := m.authored[origin]; !authored {
+		return nil, false
+	}
+	return origin, true
 }
 
 // goaTypeName returns the name of a user type in the design, ignoring the
@@ -94,7 +122,7 @@ func (m *typeMapper) collect(att *expr.AttributeExpr) {
 		return
 	}
 	_ = codegen.Walk(att, func(a *expr.AttributeExpr) error {
-		if origin, ok := hoistable(a.Type); ok {
+		if origin, ok := m.hoist(a.Type); ok {
 			if _, seen := m.names[origin]; !seen {
 				m.names[origin] = ""
 				m.origins = append(m.origins, origin)
@@ -122,15 +150,16 @@ func (m *typeMapper) assignNames(scope *codegen.NameScope) {
 // through another hoisted type.
 func (m *typeMapper) directRefs(att *expr.AttributeExpr) []expr.UserType {
 	var (
-		out  []expr.UserType
-		seen = make(map[expr.UserType]struct{})
-		walk func(a *expr.AttributeExpr)
+		out    []expr.UserType
+		seen   = make(map[expr.UserType]struct{})
+		inline = make(map[expr.UserType]struct{})
+		walk   func(a *expr.AttributeExpr)
 	)
 	walk = func(a *expr.AttributeExpr) {
 		if a == nil || a.Type == nil {
 			return
 		}
-		if origin, ok := hoistable(a.Type); ok {
+		if origin, ok := m.hoist(a.Type); ok {
 			if _, dup := seen[origin]; !dup {
 				seen[origin] = struct{}{}
 				out = append(out, origin)
@@ -138,6 +167,12 @@ func (m *typeMapper) directRefs(att *expr.AttributeExpr) []expr.UserType {
 			return
 		}
 		switch t := a.Type.(type) {
+		case expr.UserType:
+			// A type goa created: look through it, once.
+			if _, dup := inline[t]; !dup {
+				inline[t] = struct{}{}
+				walk(t.Attribute())
+			}
 		case *expr.Array:
 			walk(t.ElemType)
 		case *expr.Map:
@@ -309,6 +344,26 @@ func (m *typeMapper) typeSpec(ut expr.UserType, r *refs) *TypeSpec {
 type renderCtx struct {
 	m    *typeMapper
 	refs *refs
+	// inlining holds the unnamed user types being rendered, to stop on a
+	// reference cycle that no named type breaks.
+	inlining map[expr.UserType]struct{}
+}
+
+// enter marks an unnamed user type as being rendered. It reports false when
+// the type is already being rendered further up.
+func (c *renderCtx) enter(ut expr.UserType) bool {
+	if _, busy := c.inlining[ut]; busy {
+		return false
+	}
+	if c.inlining == nil {
+		c.inlining = make(map[expr.UserType]struct{})
+	}
+	c.inlining[ut] = struct{}{}
+	return true
+}
+
+func (c *renderCtx) leave(ut expr.UserType) {
+	delete(c.inlining, ut)
 }
 
 // objectOpts tunes how the attributes of an object are rendered.
@@ -441,15 +496,19 @@ func (c *renderCtx) objectTS(fields []field, indent string) string {
 // encoding of HTTP parameters, where goa sends bytes and untyped values as
 // plain strings.
 func (c *renderCtx) tsType(att *expr.AttributeExpr, indent string, param bool) string {
-	if origin, ok := hoistable(att.Type); ok {
+	if origin, ok := c.m.hoist(att.Type); ok {
 		name := c.m.names[origin]
 		c.refs.types[name] = struct{}{}
 		return name
 	}
 	switch t := att.Type.(type) {
 	case expr.UserType:
-		// The empty type.
-		return "Record<string, never>"
+		// A type the design does not name: render what it stands for.
+		if !c.enter(t) {
+			return "unknown"
+		}
+		defer c.leave(t)
+		return c.tsType(t.Attribute(), indent, param)
 	case expr.Primitive:
 		if lits, ok := enumLiterals(att); ok {
 			return strings.Join(lits, " | ")

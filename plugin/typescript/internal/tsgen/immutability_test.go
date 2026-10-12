@@ -9,7 +9,6 @@ import (
 	"sort"
 	"testing"
 
-	"goa.design/goa/v3/codegen"
 	"goa.design/goa/v3/expr"
 
 	tsruntime "github.com/xeger/goa-typescript/runtime"
@@ -22,7 +21,7 @@ import (
 func TestBuildDoesNotMutateDesign(t *testing.T) {
 	for _, fx := range fixtures {
 		t.Run(fx.Name, func(t *testing.T) {
-			root := codegen.RunDSL(t, fx.DSL)
+			root := design(t, fx.DSL)
 			before := hashDesign(root)
 			pkg, err := Build([]*expr.RootExpr{root}, Options{Runtime: tsruntime.Sorted()})
 			if err != nil {
@@ -79,7 +78,7 @@ func TestHashDesignDetectsMutations(t *testing.T) {
 	sort.Strings(names)
 	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
-			root := codegen.RunDSL(t, fixtures[11].DSL) // SSEWholeEvent
+			root := design(t, fixtures[11].DSL) // SSEWholeEvent
 			if fixtures[11].Name != "SSEWholeEvent" {
 				t.Fatalf("fixture 11 is %s", fixtures[11].Name)
 			}

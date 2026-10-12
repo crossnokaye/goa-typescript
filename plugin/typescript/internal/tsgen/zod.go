@@ -60,7 +60,7 @@ func (c *renderCtx) objectZod(fields []field, indent string) (string, string) {
 // Only checks and codecs are emitted, never `.transform()`: a transform cannot
 // run backwards, and every schema is used to encode as well as to decode.
 func (c *renderCtx) zod(att *expr.AttributeExpr, indent string, param bool) zexpr {
-	if origin, ok := hoistable(att.Type); ok {
+	if origin, ok := c.m.hoist(att.Type); ok {
 		name := c.m.names[origin]
 		c.refs.types[name] = struct{}{}
 		return zexpr{code: name}
@@ -68,8 +68,12 @@ func (c *renderCtx) zod(att *expr.AttributeExpr, indent string, param bool) zexp
 	c.refs.zod = true
 	switch t := att.Type.(type) {
 	case expr.UserType:
-		// The empty type.
-		return zexpr{code: "z.object({})"}
+		// A type the design does not name: render what it stands for.
+		if !c.enter(t) {
+			return zexpr{code: "z.unknown()"}
+		}
+		defer c.leave(t)
+		return c.zod(t.Attribute(), indent, param)
 	case expr.Primitive:
 		return c.zodPrimitive(att, t, param)
 	case *expr.Array:

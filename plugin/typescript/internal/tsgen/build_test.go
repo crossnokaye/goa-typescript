@@ -81,7 +81,7 @@ func TestBuildPackageMetadata(t *testing.T) {
 }
 
 func TestBuildIgnoresRootsWithoutHTTP(t *testing.T) {
-	root := codegen.RunDSL(t, testdata.SSEStringDSL)
+	root := design(t, testdata.SSEStringDSL)
 	pkg, err := Build([]*expr.RootExpr{nil, {}, root, root}, Options{})
 	if err != nil {
 		t.Fatalf("Build: %v", err)

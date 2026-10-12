@@ -108,6 +108,31 @@ describe("goaErrorDecoder", () => {
     expect(e).toBeInstanceOf(UnexpectedResponseError);
   });
 
+  it("returns UnexpectedResponseError when a declared status carries a foreign body", async () => {
+    // A proxy answering 404 is not the service's not_found.
+    const e = await decode(response(404, '{"error":"no route"}', { "content-type": "application/json" }));
+    expect(e).toBeInstanceOf(UnexpectedResponseError);
+    const html = await decode(response(404, "<html>Not Found</html>", { "content-type": "text/html" }));
+    expect(html).toBeInstanceOf(UnexpectedResponseError);
+  });
+
+  it("trusts the goa-error header when the body is not goa's default error", async () => {
+    const e = await decode(
+      response(404, '{"code":7,"message":"gone fishing"}', {
+        "content-type": "application/json",
+        "goa-error": "not_found",
+      }),
+    );
+    if (!isGoaError(e)) throw e;
+    expect(e.name).toBe("not_found");
+    expect(e.message).toBe("gone fishing");
+    expect(e.body).toEqual({ code: 7, message: "gone fishing" });
+    const text = await decode(response(404, "nope", { "content-type": "text/plain", "goa-error": "not_found" }));
+    if (!isGoaError(text)) throw text;
+    expect(text.message).toBe("not_found: HTTP 404");
+    expect(text.body).toBe("nope");
+  });
+
   it("decodes a custom error type into detail", async () => {
     const e = await decode(
       response(422, '{"field":"name","message":"too short"}', {

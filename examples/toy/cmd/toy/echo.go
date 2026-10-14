@@ -6,8 +6,8 @@ import (
 
 	"goa.design/goa/v3/security"
 
-	"github.com/xeger/goa-typescript/examples/toy/gen/echo"
-	"github.com/xeger/goa-typescript/examples/toy/gen/types"
+	"github.com/crossnokaye/goa-typescript/examples/toy/gen/echo"
+	"github.com/crossnokaye/goa-typescript/examples/toy/gen/types"
 )
 
 // echoService implements the echo service, which shares a method name and a

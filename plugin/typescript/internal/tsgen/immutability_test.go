@@ -11,7 +11,7 @@ import (
 
 	"goa.design/goa/v3/expr"
 
-	tsruntime "github.com/xeger/goa-typescript/runtime"
+	tsruntime "github.com/crossnokaye/goa-typescript/runtime"
 )
 
 // goa snapshots the design before plugins run and fails the generation when

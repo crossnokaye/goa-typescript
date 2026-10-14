@@ -3,5 +3,5 @@
 // Consumers enable the plugin by blank-importing this package from their Goa
 // design module, e.g.:
 //
-//	import _ "github.com/xeger/goa-typescript/plugin/typescript"
+//	import _ "github.com/crossnokaye/goa-typescript/plugin/typescript"
 package typescript

@@ -8,8 +8,8 @@ import (
 	"goa.design/goa/v3/eval"
 	"goa.design/goa/v3/expr"
 
-	"github.com/xeger/goa-typescript/plugin/typescript/internal/tsgen"
-	tsruntime "github.com/xeger/goa-typescript/runtime"
+	"github.com/crossnokaye/goa-typescript/plugin/typescript/internal/tsgen"
+	tsruntime "github.com/crossnokaye/goa-typescript/runtime"
 )
 
 func init() {

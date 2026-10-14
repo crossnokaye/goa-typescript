@@ -1,7 +1,7 @@
 package design
 
 import (
-	_ "github.com/xeger/goa-typescript/plugin/typescript"
+	_ "github.com/crossnokaye/goa-typescript/plugin/typescript"
 	. "goa.design/goa/v3/dsl"
 )
 

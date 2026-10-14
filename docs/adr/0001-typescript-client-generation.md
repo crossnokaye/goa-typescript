@@ -16,7 +16,7 @@ The UIs use a small slice of what Speakeasy emits: standalone functions `(core, 
 
 ## Decision
 
-`github.com/xeger/goa-typescript` is a Goa codegen plugin that reads the design expressions directly and emits a TypeScript client under `gen/ts`.
+`github.com/crossnokaye/goa-typescript` is a Goa codegen plugin that reads the design expressions directly and emits a TypeScript client under `gen/ts`.
 
 - **Goa-native, no OpenAPI.** The plugin reads `goa.design/goa/v3/expr` only. It does not use Goa's `codegen/service` or `http/codegen` data, whose constructors are no longer public, and it never mutates the design, which Goa now verifies after every plugin.
 - **One Zod 4 codec per type.** Each declared type gets a TypeScript type and a Zod schema of the same name. The schema decodes (wire to local) and encodes (local to wire), so validation and conversions such as `Date` and `Uint8Array` are defined once. Generated schemas never use `.transform()`, which cannot run backwards.

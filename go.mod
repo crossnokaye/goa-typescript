@@ -1,4 +1,4 @@
-module github.com/xeger/goa-typescript
+module github.com/crossnokaye/goa-typescript
 
 go 1.26.0
 

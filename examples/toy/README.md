@@ -2,7 +2,7 @@
 
 This is a tiny Goa design, with a server, used to **doc-test** the goa-typescript plugin.
 
-It is a Go module of its own (`github.com/xeger/goa-typescript/examples/toy`, with a `replace` pointing at the repository root): `cmd/toy` imports generated packages that are not committed, and keeping them out of the root module keeps `go vet ./...` green on a fresh checkout.
+It is a Go module of its own (`github.com/crossnokaye/goa-typescript/examples/toy`, with a `replace` pointing at the repository root): `cmd/toy` imports generated packages that are not committed, and keeping them out of the root module keeps `go vet ./...` green on a fresh checkout.
 
 ### What it proves
 
@@ -24,7 +24,7 @@ From this directory:
 
 ```bash
 # Use a Goa CLI version compatible with the repo (this repo pins goa to v3.34.0).
-go run goa.design/goa/v3/cmd/goa@v3.34.0 gen github.com/xeger/goa-typescript/examples/toy/design -o .
+go run goa.design/goa/v3/cmd/goa@v3.34.0 gen github.com/crossnokaye/goa-typescript/examples/toy/design -o .
 pnpm install --no-frozen-lockfile
 pnpm type-check
 

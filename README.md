@@ -1,6 +1,6 @@
 ## goa-typescript
 
-`github.com/xeger/goa-typescript` provides:
+`github.com/crossnokaye/goa-typescript` provides:
 
 - **`plugin/typescript/`**: a Goa v3 codegen plugin that generates a TypeScript client into `gen/ts`, straight from the design expressions (no OpenAPI step).
 - **`runtime/`**: the small TypeScript runtime that the plugin copies into every generated client (fetch client, response decoding, typed goa errors, Zod codecs, Server-Sent Events).
@@ -18,7 +18,7 @@ The Goa plugin model is: your plugin must be linked into the generator binary th
 1. Add a blank import in your design module (any file in the design package):
 
 ```go
-import _ "github.com/xeger/goa-typescript/plugin/typescript"
+import _ "github.com/crossnokaye/goa-typescript/plugin/typescript"
 ```
 
 2. Run generation:

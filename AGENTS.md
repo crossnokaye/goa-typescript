@@ -4,7 +4,7 @@ To see sample generation results, gen the toy example. It is a nested Go module,
 
 ```bash
 cd examples/toy
-go run goa.design/goa/v3/cmd/goa@v3.34.0 gen github.com/xeger/goa-typescript/examples/toy/design -o .
+go run goa.design/goa/v3/cmd/goa@v3.34.0 gen github.com/crossnokaye/goa-typescript/examples/toy/design -o .
 pnpm install --no-frozen-lockfile
 ```
 

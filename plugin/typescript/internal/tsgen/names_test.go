@@ -3,7 +3,7 @@ package tsgen
 import (
 	"testing"
 
-	tsruntime "github.com/xeger/goa-typescript/runtime"
+	tsruntime "github.com/crossnokaye/goa-typescript/runtime"
 )
 
 func TestIdentifiers(t *testing.T) {

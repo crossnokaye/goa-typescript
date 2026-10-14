@@ -1,9 +1,9 @@
-module github.com/xeger/goa-typescript/examples/toy
+module github.com/crossnokaye/goa-typescript/examples/toy
 
 go 1.26.0
 
 require (
-	github.com/xeger/goa-typescript v0.0.0
+	github.com/crossnokaye/goa-typescript v0.0.0
 	goa.design/goa/v3 v3.34.0
 )
 
@@ -21,8 +21,7 @@ require (
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/tools v0.51.0 // indirect
-	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/xeger/goa-typescript => ../..
+replace github.com/crossnokaye/goa-typescript => ../..

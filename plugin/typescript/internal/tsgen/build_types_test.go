@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xeger/goa-typescript/plugin/typescript/internal/tsgen/testdata"
+	"github.com/crossnokaye/goa-typescript/plugin/typescript/internal/tsgen/testdata"
 )
 
 // typeSpec returns the hoisted type with the given name.

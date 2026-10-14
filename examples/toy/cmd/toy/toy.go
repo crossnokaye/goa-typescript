@@ -11,8 +11,8 @@ import (
 
 	"goa.design/goa/v3/security"
 
-	"github.com/xeger/goa-typescript/examples/toy/gen/toy"
-	"github.com/xeger/goa-typescript/examples/toy/gen/types"
+	"github.com/crossnokaye/goa-typescript/examples/toy/gen/toy"
+	"github.com/crossnokaye/goa-typescript/examples/toy/gen/types"
 )
 
 // toyService implements the toy service with canned data. The TypeScript

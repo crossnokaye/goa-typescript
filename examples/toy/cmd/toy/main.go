@@ -20,10 +20,10 @@ import (
 
 	goahttp "goa.design/goa/v3/http"
 
-	"github.com/xeger/goa-typescript/examples/toy/gen/echo"
-	echosvr "github.com/xeger/goa-typescript/examples/toy/gen/http/echo/server"
-	toysvr "github.com/xeger/goa-typescript/examples/toy/gen/http/toy/server"
-	"github.com/xeger/goa-typescript/examples/toy/gen/toy"
+	"github.com/crossnokaye/goa-typescript/examples/toy/gen/echo"
+	echosvr "github.com/crossnokaye/goa-typescript/examples/toy/gen/http/echo/server"
+	toysvr "github.com/crossnokaye/goa-typescript/examples/toy/gen/http/toy/server"
+	"github.com/crossnokaye/goa-typescript/examples/toy/gen/toy"
 )
 
 func main() {

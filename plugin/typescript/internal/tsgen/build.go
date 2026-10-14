@@ -9,7 +9,7 @@ import (
 	"goa.design/goa/v3/expr"
 	goa "goa.design/goa/v3/pkg"
 
-	tsruntime "github.com/xeger/goa-typescript/runtime"
+	tsruntime "github.com/crossnokaye/goa-typescript/runtime"
 )
 
 // Options configures Build.

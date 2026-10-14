@@ -6,7 +6,7 @@ import (
 
 	. "goa.design/goa/v3/dsl"
 
-	"github.com/xeger/goa-typescript/plugin/typescript/internal/tsgen/testdata"
+	"github.com/crossnokaye/goa-typescript/plugin/typescript/internal/tsgen/testdata"
 )
 
 // response returns the response an endpoint declares for a status.

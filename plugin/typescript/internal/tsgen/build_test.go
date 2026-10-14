@@ -9,8 +9,8 @@ import (
 	. "goa.design/goa/v3/dsl"
 	"goa.design/goa/v3/expr"
 
-	"github.com/xeger/goa-typescript/plugin/typescript/internal/tsgen/testdata"
-	tsruntime "github.com/xeger/goa-typescript/runtime"
+	"github.com/crossnokaye/goa-typescript/plugin/typescript/internal/tsgen/testdata"
+	tsruntime "github.com/crossnokaye/goa-typescript/runtime"
 )
 
 // service returns the named service of a package description.

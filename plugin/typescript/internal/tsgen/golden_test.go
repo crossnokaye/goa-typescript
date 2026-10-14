@@ -16,8 +16,8 @@ import (
 	"goa.design/goa/v3/eval"
 	"goa.design/goa/v3/expr"
 
-	"github.com/xeger/goa-typescript/plugin/typescript/internal/tsgen/testdata"
-	tsruntime "github.com/xeger/goa-typescript/runtime"
+	"github.com/crossnokaye/goa-typescript/plugin/typescript/internal/tsgen/testdata"
+	tsruntime "github.com/crossnokaye/goa-typescript/runtime"
 )
 
 var update = flag.Bool("update", false, "rewrite the golden files under testdata/golden")

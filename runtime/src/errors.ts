@@ -65,8 +65,8 @@ export class GoaError<Name extends string = string, Detail = undefined> extends 
 /**
  * NetworkError reports that the request never produced a response, or that a
  * stream broke. For a WebSocket, `closeCode` and `closeReason` carry the close
- * event that ended it, when there was one (1006 for a connection that dropped
- * or a handshake the server refused).
+ * event that ended it, when there was one (a browser reports 1006 for a
+ * connection that dropped or a handshake the server refused).
  */
 export class NetworkError extends Error {
   readonly kind = "network" as const;

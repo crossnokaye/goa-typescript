@@ -17,6 +17,18 @@
 {{ template "partial_type_decl" (dict "Name" .EventTypeName "TSDef" .EventTSDef "Zod" .EventZod "ZodNote" .EventZodNote "Recursive" false "Description" "") }}
 {{- end }}
 {{- end }}
+{{- with .WS }}
+{{- if .RecvInline }}
+
+{{ jsdoc (printf "%s is a message the server sends on %s." .RecvTypeName $.FuncName) "" -}}
+{{ template "partial_type_decl" (dict "Name" .RecvTypeName "TSDef" .RecvTSDef "Zod" .RecvZod "ZodNote" .RecvZodNote "Recursive" false "Description" "") }}
+{{- end }}
+{{- if .SendInline }}
+
+{{ jsdoc (printf "%s is a message the client sends on %s." .SendTypeName $.FuncName) "" -}}
+{{ template "partial_type_decl" (dict "Name" .SendTypeName "TSDef" .SendTSDef "Zod" .SendZod "ZodNote" .SendZodNote "Recursive" false "Description" "") }}
+{{- end }}
+{{- end }}
 {{- range .Errors }}
 {{- if .Inline }}
 

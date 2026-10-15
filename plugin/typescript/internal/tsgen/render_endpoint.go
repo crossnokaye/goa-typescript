@@ -14,7 +14,7 @@ func renderService(pkg *PackageSpec, svc *ServiceSpec) []*codegen.File {
 	files := []*codegen.File{
 		tsFile(pkg, path.Join("src", svc.Dir, "index.ts"), "service_index", nil, svc),
 	}
-	partials := []string{"type_decl", "endpoint_types", "endpoint_errors", "rest_func", "sse_func"}
+	partials := []string{"type_decl", "endpoint_types", "endpoint_errors", "rest_func", "sse_func", "websocket_func"}
 	for _, ep := range svc.Endpoints {
 		data := endpointData{
 			EndpointSpec:   ep,
@@ -30,6 +30,9 @@ func renderService(pkg *PackageSpec, svc *ServiceSpec) []*codegen.File {
 				data.StreamFuncName = ep.Stream.FuncName
 				data.StreamDoc = sseDoc(ep)
 			}
+		case ep.Kind == EndpointWebSocket:
+			tmpl = "endpoint_websocket"
+			data.Doc = webSocketDoc(ep)
 		default:
 			data.Doc = sseDoc(ep)
 		}
@@ -66,6 +69,52 @@ func sseDoc(ep *EndpointSpec) string {
 	return docHead(ep) + " (Server-Sent Events)\n\n" +
 		"The stream does not reconnect: iterate it with `for await` and call again with\n" +
 		"`options.lastEventId` to resume."
+}
+
+// webSocketDoc describes a WebSocket function, including what the browser
+// WebSocket API keeps it from doing.
+func webSocketDoc(ep *EndpointSpec) string {
+	var b strings.Builder
+	b.WriteString(docHead(ep) + " (WebSocket)")
+	note := func(lines ...string) {
+		b.WriteString("\n\n" + strings.Join(lines, "\n"))
+	}
+	ws := ep.WS
+	switch {
+	case ws.Kind == "server":
+		note("Resolves once the socket is open. Iterate the stream with `for await`: the loop ends",
+			"when the server closes the connection.")
+	case ws.Kind == "bidirectional":
+		note("Resolves once the socket is open. Send with `stream.send(message)`, call `stream.end()`",
+			"when there is nothing more to send, and iterate the stream with `for await` for what",
+			"the server sends: the loop ends when the server closes the connection.")
+	case ws.RecvTypeName != "":
+		note("Resolves once the socket is open. Send with `stream.send(message)`, then call",
+			"`stream.end()`: the stream yields the one result, then the loop ends.")
+	default:
+		note("Resolves once the socket is open. Send with `stream.send(message)`, then call",
+			"`stream.end()`: the server sends nothing back, and the loop ends when it closes the",
+			"connection.")
+	}
+	if len(ws.DeclaredErrors) > 0 {
+		note(fmt.Sprintf("The errors the design declares (%s) cannot be told apart: a refused connection",
+			codeList(ws.DeclaredErrors)),
+			"is a `NetworkError`, because the browser hides the handshake response.")
+	}
+	var headers []string
+	for _, s := range ws.HeaderCredentials {
+		headers = append(headers, fmt.Sprintf("- the `%s` credential, in `%s`", s.Scheme, s.Name))
+	}
+	for _, p := range ws.HeaderParams {
+		headers = append(headers, fmt.Sprintf("- `%s`, in `%s`", p.Prop, p.Wire))
+	}
+	if len(headers) > 0 {
+		note(append([]string{
+			"The browser WebSocket API cannot send headers. These reach the server only through a",
+			"`ClientOptions.webSocket` factory that sends `init.headers`:",
+		}, headers...)...)
+	}
+	return b.String()
 }
 
 // restDoc describes a REST function, including what a caller cannot tell

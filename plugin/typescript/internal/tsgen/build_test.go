@@ -332,7 +332,8 @@ func TestBuildTwoServices(t *testing.T) {
 	// Types are shared; the opted-out service contributes none.
 	wantEqual(t, "types", typeNames(pkg), []string{"Thing"})
 
-	wantEqual(t, "echo skipped", echo.Skipped, []SkippedEndpoint{{Method: "chat", Reason: "WebSocket endpoints are not generated yet"}})
+	wantEqual(t, "echo skipped", len(echo.Skipped), 0)
+	wantEqual(t, "echo chat", endpoint(t, echo, "chat").Kind, EndpointWebSocket)
 	wantEqual(t, "toy skipped", len(toy.Skipped), 0)
 	wantEqual(t, "toy get_thing", endpoint(t, toy, "get_thing").Kind, EndpointREST)
 	if !echo.HasWS || !echo.HasSSE || !toy.HasREST || !toy.HasSSE {

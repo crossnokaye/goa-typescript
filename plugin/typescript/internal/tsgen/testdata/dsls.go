@@ -1354,3 +1354,208 @@ var RequestsDSL = func() {
 		})
 	})
 }
+
+// WSServerDSL streams from the server over a WebSocket.
+var WSServerDSL = func() {
+	var Tick = Type("Tick", func() {
+		Attribute("n", Int)
+		Attribute("at", String, func() { Format(FormatDateTime) })
+		Attribute("kind", String, func() { Default("tick") })
+		Required("n")
+	})
+	var Reading = ResultType("application/vnd.reading", func() {
+		Attributes(func() {
+			Attribute("id", String)
+			Attribute("value", Float64)
+			Attribute("note", String)
+			Required("id", "value")
+		})
+		View("default", func() {
+			Attribute("id")
+			Attribute("value")
+			Attribute("note")
+		})
+		View("tiny", func() {
+			Attribute("id")
+			Attribute("value")
+		})
+	})
+	Service("svc", func() {
+		Error("not_found")
+		HTTP(func() {
+			Path("/api")
+			Response("not_found", StatusNotFound)
+		})
+		Method("watch_ticks", func() {
+			Description("Streams ticks of a thing.")
+			Payload(func() {
+				Attribute("id", String)
+				Attribute("count", Int, func() { Default(3) })
+				Attribute("kinds", ArrayOf(String))
+				Required("id")
+			})
+			StreamingResult(Tick)
+			HTTP(func() {
+				GET("/things/{id}/ticks")
+				Param("count")
+				Param("kinds:kind")
+			})
+		})
+		Method("watch_counts", func() {
+			Description("No payload; the server streams plain integers.")
+			StreamingResult(Int)
+			HTTP(func() {
+				GET("/counts")
+			})
+		})
+		Method("watch_readings", func() {
+			Description("A result type with views: the server picks the view.")
+			Payload(func() {
+				Attribute("view", String, func() { Enum("default", "tiny") })
+			})
+			StreamingResult(Reading)
+			HTTP(func() {
+				GET("/readings")
+				Param("view")
+			})
+		})
+	})
+}
+
+// WSBidirectionalDSL streams both ways over a WebSocket.
+var WSBidirectionalDSL = func() {
+	var Note = Type("Note", func() {
+		Attribute("text", String, func() { MinLength(1) })
+		Attribute("loud", Boolean, func() { Default(false) })
+		Required("text")
+	})
+	Service("svc", func() {
+		Method("echo", func() {
+			Description("Inline types both ways.")
+			Payload(func() {
+				Attribute("room", String)
+				Required("room")
+			})
+			StreamingPayload(func() {
+				Attribute("text", String)
+				Attribute("at", String, func() { Format(FormatDateTime) })
+				Attribute("repeat", Int, func() { Default(1) })
+				Required("text")
+			})
+			StreamingResult(func() {
+				Attribute("text", String)
+				Attribute("length", Int)
+				Required("text", "length")
+			})
+			HTTP(func() {
+				GET("/rooms/{room}/echo")
+			})
+		})
+		Method("notes", func() {
+			Description("A named streaming payload with a default: the client sends its request-side variant.")
+			StreamingPayload(Note)
+			StreamingResult(Note)
+			HTTP(func() {
+				GET("/notes")
+			})
+		})
+	})
+}
+
+// WSClientDSL streams from the client over a WebSocket.
+var WSClientDSL = func() {
+	var Total = Type("Total", func() {
+		Attribute("sum", Int)
+		Attribute("count", Int)
+		Required("sum", "count")
+	})
+	Service("svc", func() {
+		Method("sum", func() {
+			Description("Sums the integers it is sent.")
+			StreamingPayload(Int)
+			Result(Total)
+			HTTP(func() {
+				GET("/sum")
+			})
+		})
+		Method("upload", func() {
+			Description("An inline result, and an optional payload in the query.")
+			Payload(func() {
+				Attribute("label", String)
+			})
+			StreamingPayload(ArrayOf(String))
+			Result(func() {
+				Attribute("lines", Int)
+				Required("lines")
+			})
+			HTTP(func() {
+				GET("/upload")
+				Param("label")
+			})
+		})
+		Method("drain", func() {
+			Description("No result: the server closes the connection once the client is done.")
+			StreamingPayload(String)
+			HTTP(func() {
+				GET("/drain")
+			})
+		})
+		Method("partial", func() {
+			Description("The result is sent as one of its attributes: not supported.")
+			StreamingPayload(String)
+			Result(Total)
+			HTTP(func() {
+				GET("/partial")
+				Response(StatusOK, func() {
+					Body("sum")
+				})
+			})
+		})
+	})
+}
+
+// WSSecurityDSL covers credentials and headers on WebSocket endpoints.
+var WSSecurityDSL = func() {
+	var JWT = JWTSecurity("jwt")
+	var Key = APIKeySecurity("api_key")
+	Service("svc", func() {
+		Security(JWT)
+		Error("unauthorized")
+		HTTP(func() { Response("unauthorized", StatusUnauthorized) })
+		Method("keyed", func() {
+			Description("An API key in the query string: the browser sends it.")
+			Security(Key)
+			Payload(func() {
+				APIKey("api_key", "key", String)
+				Attribute("id", String)
+				Required("key", "id")
+			})
+			StreamingResult(String)
+			HTTP(func() {
+				GET("/keyed/{id}")
+				Param("key:api_key")
+			})
+		})
+		Method("jwt", func() {
+			Description("A JWT in the Authorization header and a header parameter: the browser sends neither.")
+			Payload(func() {
+				Token("token", String)
+				Attribute("trace", String)
+				Required("token")
+			})
+			StreamingPayload(String)
+			StreamingResult(String)
+			HTTP(func() {
+				GET("/jwt")
+				Header("trace:X-Trace-Id")
+			})
+		})
+		Method("public", func() {
+			NoSecurity()
+			StreamingResult(String)
+			HTTP(func() {
+				GET("/public")
+			})
+		})
+	})
+}

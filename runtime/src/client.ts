@@ -30,6 +30,15 @@ export interface ClientOptions {
   auth?: TokenProvider | Record<string, TokenProvider> | undefined;
   /** fetch replaces the global fetch. */
   fetch?: typeof fetch | undefined;
+  /**
+   * webSocket replaces the global `WebSocket` constructor for WebSocket
+   * endpoints, the way `fetch` replaces the global fetch. `init.headers` holds
+   * the headers the call would send (client headers, header parameters,
+   * header credentials, per-call headers), which the browser `WebSocket` API
+   * cannot send: a factory built on a library that can, such as `ws` in
+   * Node, may pass them on.
+   */
+  webSocket?: WebSocketFactory | undefined;
   /** middleware wraps every request; the first entry is outermost. */
   middleware?: readonly Middleware[] | undefined;
   /** headers are sent with every request. */
@@ -38,6 +47,13 @@ export interface ClientOptions {
   /** timeoutMs bounds the wait for response headers. Streams are not cut off once they start. */
   timeoutMs?: number | undefined;
 }
+
+/** WebSocketFactory opens a WebSocket; see `ClientOptions.webSocket`. */
+export type WebSocketFactory = (
+  url: string,
+  protocols: string | string[] | undefined,
+  init: { headers: Headers },
+) => WebSocket;
 
 /** Client carries the configuration shared by every generated function. */
 export interface Client {
@@ -90,38 +106,40 @@ export interface EndpointSpec {
   /** mapQuery names the request property whose entries spread into the query string ("" = the whole request). */
   mapQuery?: string | undefined;
   body?: EndpointBody | undefined;
+  /** accept is the Accept header; "" sends none (WebSocket endpoints). */
   accept: string;
   security: readonly SecurityScheme[];
 }
 
 /**
- * send performs one HTTP exchange for an endpoint. `wire` is the request after
- * schema encoding. It resolves once response headers arrive; reading the body
- * is left to the caller.
- *
- * `rawBody` is the body of an endpoint whose spec says `body: { kind: "raw" }`.
- * No `Content-Type` is set for it unless a header parameter or the caller
- * does; fetch derives one from a `Blob`, `FormData` or string. A
- * `ReadableStream` is sent with `duplex: "half"`, which Safari and Firefox do
- * not support.
+ * PreparedRequest is the part of an HTTP request derived from the endpoint
+ * spec, the encoded request, the client configuration and the call options.
  */
-export async function send(
+export interface PreparedRequest {
+  /** url is absolute when the base URL is; the path and query are filled in. */
+  url: string;
+  /** headers are the client's, the endpoint's, the caller's and the credentials. */
+  headers: Headers;
+  /** body is the JSON body (or the raw body) to send, if any. */
+  body?: BodyInit | undefined;
+}
+
+/**
+ * prepareRequest assembles the URL, headers and body of a request: path,
+ * query and header parameters from `wire` (the request after schema
+ * encoding), the JSON body per `spec.body`, then the caller's headers, then
+ * the credentials of every security scheme that has a provider.
+ *
+ * It fails only when a credential provider throws.
+ */
+export async function prepareRequest(
   client: Client,
   spec: EndpointSpec,
   wire: unknown,
-  options?: StreamOptions,
+  options?: { headers?: HeadersInit | undefined; baseURL?: string | undefined; lastEventId?: string | undefined },
   rawBody?: BodyInit | null,
-): Promise<Result<Response, TransportError>> {
-  const {
-    signal: callerSignal,
-    headers: callHeaders,
-    timeoutMs: callTimeout,
-    baseURL: callBaseURL,
-    lastEventId,
-    ...init
-  } = options ?? {};
+): Promise<Result<PreparedRequest, NetworkError>> {
   const config = client.options;
-  const timeoutMs = callTimeout ?? config.timeoutMs;
 
   // A non-object request (primitive, array or map payload) is itself the
   // value of whichever single element the design maps it to.
@@ -141,15 +159,17 @@ export async function send(
   }
 
   const headers = new Headers(config.headers);
-  headers.set("Accept", spec.accept);
+  if (spec.accept) {
+    headers.set("Accept", spec.accept);
+  }
   for (const [prop, name] of Object.entries(spec.headerParams)) {
     const value = get(prop);
     if (value !== undefined && value !== null) {
       headers.set(name, encodeHeaderValue(value));
     }
   }
-  if (lastEventId) {
-    headers.set("Last-Event-ID", lastEventId);
+  if (options?.lastEventId) {
+    headers.set("Last-Event-ID", options.lastEventId);
   }
 
   let body: BodyInit | undefined;
@@ -182,7 +202,7 @@ export async function send(
     }
   }
 
-  new Headers(callHeaders).forEach((value, name) => headers.set(name, value));
+  new Headers(options?.headers).forEach((value, name) => headers.set(name, value));
 
   try {
     for (const scheme of spec.security) {
@@ -196,7 +216,50 @@ export async function send(
     return err(new NetworkError("credential provider failed", { cause }));
   }
 
-  const url = buildURL(callBaseURL ?? config.baseURL, spec.path, pathParams, query);
+  const url = buildURL(options?.baseURL ?? config.baseURL, spec.path, pathParams, query);
+  return ok({ url, headers, body });
+}
+
+/**
+ * send performs one HTTP exchange for an endpoint. `wire` is the request after
+ * schema encoding. It resolves once response headers arrive; reading the body
+ * is left to the caller.
+ *
+ * `rawBody` is the body of an endpoint whose spec says `body: { kind: "raw" }`.
+ * No `Content-Type` is set for it unless a header parameter or the caller
+ * does; fetch derives one from a `Blob`, `FormData` or string. A
+ * `ReadableStream` is sent with `duplex: "half"`, which Safari and Firefox do
+ * not support.
+ */
+export async function send(
+  client: Client,
+  spec: EndpointSpec,
+  wire: unknown,
+  options?: StreamOptions,
+  rawBody?: BodyInit | null,
+): Promise<Result<Response, TransportError>> {
+  const {
+    signal: callerSignal,
+    headers: callHeaders,
+    timeoutMs: callTimeout,
+    baseURL: callBaseURL,
+    lastEventId,
+    ...init
+  } = options ?? {};
+  const config = client.options;
+  const timeoutMs = callTimeout ?? config.timeoutMs;
+
+  const prepared = await prepareRequest(
+    client,
+    spec,
+    wire,
+    { headers: callHeaders, baseURL: callBaseURL, lastEventId },
+    rawBody,
+  );
+  if (!prepared.ok) {
+    return prepared;
+  }
+  const { url, headers, body } = prepared.value;
 
   const timeout = timeoutMs && timeoutMs > 0 ? new AbortController() : undefined;
   let timedOut = false;

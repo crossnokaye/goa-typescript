@@ -62,13 +62,24 @@ export class GoaError<Name extends string = string, Detail = undefined> extends 
   }
 }
 
-/** NetworkError reports that the request never produced a response. */
+/**
+ * NetworkError reports that the request never produced a response, or that a
+ * stream broke. For a WebSocket, `closeCode` and `closeReason` carry the close
+ * event that ended it, when there was one (1006 for a connection that dropped
+ * or a handshake the server refused).
+ */
 export class NetworkError extends Error {
   readonly kind = "network" as const;
   override readonly name = "NetworkError";
+  readonly closeCode?: number;
+  readonly closeReason?: string;
 
-  constructor(message: string, options?: { cause?: unknown }) {
-    super(message, options);
+  constructor(message: string, options?: { cause?: unknown; closeCode?: number; closeReason?: string }) {
+    super(message, options && "cause" in options ? { cause: options.cause } : undefined);
+    if (options?.closeCode !== undefined) {
+      this.closeCode = options.closeCode;
+      this.closeReason = options.closeReason ?? "";
+    }
   }
 }
 

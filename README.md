@@ -3,11 +3,11 @@
 `github.com/crossnokaye/goa-typescript` provides:
 
 - **`plugin/typescript/`**: a Goa v3 codegen plugin that generates a TypeScript client into `gen/ts`, straight from the design expressions (no OpenAPI step).
-- **`runtime/`**: the small TypeScript runtime that the plugin copies into every generated client (fetch client, response decoding, typed goa errors, Zod codecs, Server-Sent Events).
+- **`runtime/`**: the small TypeScript runtime that the plugin copies into every generated client (fetch client, response decoding, typed goa errors, Zod codecs, Server-Sent Events, WebSocket streams).
 
 The generated client is functional (`fn(client, payload?, options?)`), returns `Result` values instead of throwing, types goa errors by name, and pairs every design type with a [Zod 4](https://zod.dev) schema of the same name.
 
-**Status:** REST and Server-Sent Events endpoints are generated today. Types and schemas are generated for every HTTP endpoint; functions for WebSocket endpoints are on the [roadmap](#roadmap).
+**Status:** REST, Server-Sent Events and WebSocket endpoints are generated today, and types and schemas for every HTTP endpoint. Multipart requests and file servers are on the [roadmap](#roadmap).
 
 ### Try it on a service (minimal)
 
@@ -82,8 +82,9 @@ import { createClient } from "toy-client";
 const client = createClient({
   baseURL: "https://api.example.com", // a path prefix is kept; a relative URL works in a browser
   auth: () => getAccessToken(),       // string or function, sync or async, asked on every call
-  timeoutMs: 10_000,                  // bounds the wait for response headers; streams are not cut off
+  timeoutMs: 10_000,                  // bounds the wait for response headers (or for a WebSocket to open); streams are not cut off
   headers: { "X-Client": "web" },
+  // webSocket: (url, protocols, init) => ..., // replaces the global WebSocket; see Streaming methods (WebSocket)
   middleware: [
     async (req, next) => {
       const res = await next(req);
@@ -94,6 +95,8 @@ const client = createClient({
 });
 ```
 
+Middleware wraps `fetch`, so it applies to REST and SSE functions; a WebSocket has no `Request` or `Response` to hand it.
+
 **Credentials.** The attributes a design marks with `Token`, `AccessToken`, `APIKey`, `Username` and `Password` are left out of the request types. The client fills them in from `auth`, in the header or query parameter the design maps them to:
 
 - a bare provider is used for every security scheme;
@@ -103,7 +106,7 @@ const client = createClient({
 
 Methods declared with `NoSecurity()` never receive a credential.
 
-**Per-call options** are the last argument of every function: `signal`, `headers`, `timeoutMs`, `baseURL`, and any other `RequestInit` field (`cache`, `credentials`, ...).
+**Per-call options** are the last argument of every function: `signal`, `headers`, `timeoutMs`, `baseURL`, and any other `RequestInit` field (`cache`, `credentials`, ...). A WebSocket function takes `signal`, `headers`, `timeoutMs`, `baseURL` and `protocols`.
 
 **One call shape.** Every function is `fn(client, payload?, options?)`, whatever the method declares ([ADR 0003](docs/adr/0003-one-call-shape.md)). The payload is always the second argument:
 
@@ -241,6 +244,65 @@ while (!signal.aborted) {
 
 When the design names the payload attribute that carries the ID (`SSERequestID("last_event_id")`), that attribute is left out of the request type: `options.lastEventId` supplies it.
 
+### Streaming methods (WebSocket)
+
+A method that streams over a WebSocket (it declares a `StreamingPayload`, or a `StreamingResult` without `ServerSentEvents()`) becomes a function `fn(client, payload?, options?)`, shaped like the [others](#client-configuration), that resolves once the socket is open to a `WebSocketStream<Recv, Send>` ([ADR 0005](docs/adr/0005-websocket-over-the-native-api.md)):
+
+```ts
+import { toy } from "toy-client";
+
+const result = await toy.echoWs(client, { prefix: ">" }, { signal });
+if (!result.ok) {
+  return handle(result.error); // a NetworkError when the server refused the connection
+}
+const stream = result.value;
+stream.send({ text: "hello" }); // validated and encoded; returns a Result, never throws
+stream.end();                   // nothing more to send: goa's end-of-stream null; returns a Result too
+for await (const reply of stream) {
+  render(reply); // typed, validated, dates already Date objects
+}
+// The loop ends when the server closes the connection with code 1000.
+```
+
+| Design | `Recv` (what the loop yields) | `Send` (what `send` takes) |
+|---|---|---|
+| `StreamingResult(T)` | `T` | `never`: `send` does not type-check |
+| `StreamingPayload(P)`, `StreamingResult(T)` | `T` | `P`, on its request side (`PRequest` when it has defaults) |
+| `StreamingPayload(P)`, `Result(T)` | `T`: one value, after `end()` | `P` |
+| `StreamingPayload(P)` and no result | `never` | `P` |
+
+An unnamed type is declared in the method's file as `<Method>Result` or `<Method>StreamingPayload`.
+
+- The `Payload` travels in the upgrade request, a `GET`: path and query parameters (goa allows no body there).
+- Every message is one JSON text frame. A message the server sends that does not match its schema throws `ResponseValidationError` from the loop and closes the socket. `send` returns the validation error of a message that does not match, and sends nothing; on a closed socket it returns a `NetworkError`.
+- `end()` sends the JSON `null` with which a goa client ends its stream; the socket stays open for what the server sends next. It returns a `Result` like `send`: a `NetworkError` when the socket is no longer open. Calling it again does nothing, and `send` fails after it with a `NetworkError`, since goa's server reads nothing after the `null`. A client-streaming method answers with its one result, then the loop ends (goa drops that connection without a close frame; the stream knows to expect it).
+- The loop ends when the server closes with code 1000, the way goa ends a stream, and when the client closes: `stream.close(code?, reason?)`, leaving the loop (`break`, `return`, an exception), or aborting `signal`, which closes with 1000 and throws `AbortError` from the loop. Any other close throws a `NetworkError` whose `closeCode` and `closeReason` say why.
+- `stream.closed` resolves with `{ code, reason, wasClean }` once the socket is closed; `stream.socket` is the `WebSocket` itself.
+- `timeoutMs` bounds the wait for the socket to open (`TimeoutError`); an open socket is never cut off.
+- The URL is the endpoint's with `http:` and `https:` turned into `ws:` and `wss:`. A relative `baseURL` resolves against the page's location.
+
+**What a browser `WebSocket` cannot do**, and what the client does about it:
+
+- **No headers.** The browser API sends no custom header. Credentials the design maps to the query string, like `Param("key:api_key")` for an API key, work as for any function. Credentials mapped to a header (a JWT in `Authorization`, the default; an API key header; basic auth) and payload attributes mapped with `Header(...)` are not sent: the function's documentation lists them. In a browser, map the credential to a query parameter or authenticate with a cookie. Elsewhere, set `ClientOptions.webSocket`, a factory that replaces the global `WebSocket` the way `fetch` replaces the global fetch; its third argument carries the headers the call would send:
+
+  ```ts
+  import WebSocket from "ws";
+
+  const client = createClient({
+    baseURL,
+    auth: getToken,
+    webSocket: (url, protocols, { headers }) =>
+      new WebSocket(url, protocols, { headers: Object.fromEntries(headers) }) as unknown as globalThis.WebSocket,
+  });
+  ```
+
+  Node 22 and later have a global `WebSocket` (undici's), used by default, whose constructor also takes `{ protocols, headers }` as its second argument.
+- **No handshake response.** When the server refuses the upgrade, with an error the design declares or any other HTTP response, the browser reports only that the connection failed. The function returns a `NetworkError`, never a typed `GoaError`: its error union is `RequestValidationError | TransportError`, and the errors the design declares are listed in its documentation instead. For the same reason `result.response` is a stand-in, an empty `200` `Response`.
+- **No view.** goa names the view of a viewed result in the `goa-view` header of the upgrade response, which script cannot read. Attributes that some view leaves out are optional in the generated type, so every view decodes.
+- **No middleware**, which wraps `fetch`.
+
+Not supported: reconnection (call again), binary frames (goa sends text), backpressure (`stream.socket.bufferedAmount` is there to read), ping and pong (the browser answers pings on its own). A client-streaming method whose `Response` sends the result as one attribute (`Body("total")`) is not generated, and listed at the bottom of the service barrel.
+
 ### Models and schemas
 
 Every type the design declares with `Type` or `ResultType` gets one TypeScript type and one Zod schema **with the same name**, the usual Zod idiom:
@@ -324,7 +386,7 @@ Every member has a string `kind`:
 | `kind` | Class | Meaning |
 |---|---|---|
 | `"goa"` | `GoaError<Name, Detail>` | the service returned an error; `name` is the goa error name |
-| `"network"`, `"abort"`, `"timeout"` | `NetworkError`, `AbortError`, `TimeoutError` | no response |
+| `"network"`, `"abort"`, `"timeout"` | `NetworkError`, `AbortError`, `TimeoutError` | no response; a WebSocket's `NetworkError` carries `closeCode` and `closeReason` |
 | `"request_validation"` | `RequestValidationError` | the request does not satisfy the design; nothing was sent |
 | `"response_validation"` | `ResponseValidationError` | the response does not satisfy the design |
 | `"unexpected_response"` | `UnexpectedResponseError` | a status or body the design does not describe (a proxy's 502 page, say) |
@@ -376,7 +438,6 @@ The generated package is meant to be a workspace member consumed as source:
 
 ### Roadmap
 
-- **WebSocket**: bidirectional and server-only streams over the native `WebSocket`.
 - **Multipart requests and file servers.**
 
 Until then the service barrel lists the methods it skipped, and their types and schemas are generated all the same.

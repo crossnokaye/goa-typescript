@@ -58,6 +58,10 @@ var fixtures = []struct {
 	{"RESTSkipped", testdata.RESTSkippedDSL},
 	{"NamedAttrs", testdata.NamedAttrsDSL},
 	{"Requests", testdata.RequestsDSL},
+	{"WSServer", testdata.WSServerDSL},
+	{"WSBidirectional", testdata.WSBidirectionalDSL},
+	{"WSClient", testdata.WSClientDSL},
+	{"WSSecurity", testdata.WSSecurityDSL},
 }
 
 // design evaluates a DSL the way `goa gen` hands it to plugins: evaluated,

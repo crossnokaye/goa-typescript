@@ -185,24 +185,29 @@ func (b *builder) buildService(spec *ServiceSpec, svc *expr.HTTPServiceExpr) err
 		var (
 			method = e.MethodExpr.Name
 			sse    = e.UsesSSE()
+			ws     = e.UsesWebSocket()
 			// plain is true when a function returns the method's result
 			// from an ordinary response.
-			plain = !sse || e.MethodExpr.HasMixedResults()
+			plain = !ws && (!sse || e.MethodExpr.HasMixedResults())
 		)
 		switch {
 		case sse:
 			spec.HasSSE = true
 			spec.HasREST = spec.HasREST || plain
-		case e.UsesWebSocket():
+		case ws:
 			spec.HasWS = true
-			skip(method, "WebSocket endpoints are not generated yet")
-			continue
 		default:
 			spec.HasREST = true
 		}
 		if reason := unsupported(e); reason != "" {
 			skip(method, reason)
 			continue
+		}
+		if ws {
+			if reason := unsupportedWebSocket(e); reason != "" {
+				skip(method, reason)
+				continue
+			}
 		}
 		if plain {
 			if reason := unsupportedREST(e); reason != "" {
@@ -219,9 +224,14 @@ func (b *builder) buildService(spec *ServiceSpec, svc *expr.HTTPServiceExpr) err
 			ep  *EndpointSpec
 			err error
 		)
-		if plain {
+		switch {
+		case ws:
+			// goa refuses a WebSocket method with both a Result and a
+			// StreamingResult, so there is no mixed case here.
+			ep, err = b.buildWebSocketEndpoint(e, names, files)
+		case plain:
 			ep, err = b.buildRESTEndpoint(e, names, files)
-		} else {
+		default:
 			ep, err = b.buildSSEEndpoint(e, names, files)
 		}
 		if err != nil {

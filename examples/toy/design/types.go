@@ -172,3 +172,14 @@ var ThingSummary = Type("ThingSummary", func() {
 	})
 	Required("id")
 })
+
+// Tick is what watch_ticks streams over a WebSocket.
+var Tick = Type("Tick", func() {
+	Description("One tick of watch_ticks.")
+	Attribute("n", Int, "Sequence number, from 1")
+	Attribute("id", String, "The watched identifier")
+	Attribute("at", String, "When the tick was sent", func() {
+		Format(FormatDateTime)
+	})
+	Required("n", "id", "at")
+})

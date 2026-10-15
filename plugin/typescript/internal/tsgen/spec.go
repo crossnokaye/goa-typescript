@@ -371,9 +371,54 @@ type SSESpec struct {
 	RequestIDField string
 }
 
-// WebSocketSpec describes a WebSocket endpoint.
+// WebSocketSpec describes the frames of a WebSocket endpoint.
 type WebSocketSpec struct {
-	SendTypeName string
+	// Kind is the goa stream kind: "server", "client" or "bidirectional".
+	Kind string
+	// RecvTypeName names the type and schema of the messages the server
+	// sends; "" when it sends none.
 	RecvTypeName string
-	ServerOnly   bool
+	// RecvInline is true when that type is declared in the endpoint file
+	// because the design does not name it.
+	RecvInline bool
+	// RecvTSDef and RecvZod define an inline received type.
+	RecvTSDef   string
+	RecvZod     string
+	RecvZodNote string
+	// SendTypeName names the type and schema of the messages the client
+	// sends; "" for a server stream.
+	SendTypeName string
+	// SendInline is true when that type is declared in the endpoint file.
+	SendInline bool
+	// SendTSDef and SendZod define an inline sent type.
+	SendTSDef   string
+	SendZod     string
+	SendZodNote string
+	// Single is true when the server sends one message, then drops the
+	// connection: the result of a client stream.
+	Single bool
+	// HeaderCredentials are the security schemes whose credential travels in
+	// a header, which the browser WebSocket API cannot send.
+	HeaderCredentials []SecurityBinding
+	// HeaderParams are the request properties mapped to headers, likewise.
+	HeaderParams []ParamSpec
+	// DeclaredErrors are the names of the errors the design declares, which
+	// the client cannot tell apart from a failed connection.
+	DeclaredErrors []string
+}
+
+// RecvTS is the TypeScript type of the received messages.
+func (w *WebSocketSpec) RecvTS() string {
+	if w.RecvTypeName == "" {
+		return "never"
+	}
+	return w.RecvTypeName
+}
+
+// SendTS is the TypeScript type of the sent messages.
+func (w *WebSocketSpec) SendTS() string {
+	if w.SendTypeName == "" {
+		return "never"
+	}
+	return w.SendTypeName
 }

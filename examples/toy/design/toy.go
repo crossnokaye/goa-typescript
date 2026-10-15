@@ -138,6 +138,75 @@ var _ = Service("toy", func() {
 		})
 	})
 
+	Method("watch_ticks", func() {
+		Description("Streams ticks over a WebSocket, then closes with code 1000. Authenticates with an API key " +
+			"in the query string, which a browser WebSocket can send. The id \"missing\" fails with not_found " +
+			"before the upgrade.")
+		Security(APIKeyAuth)
+		Payload(func() {
+			APIKey("api_key", "key", String, "API key, supplied by the client's auth option")
+			Attribute("id", String, "Identifier to watch")
+			Attribute("count", Int, "Number of ticks", func() {
+				Default(3)
+			})
+			Attribute("delay_ms", Int, "Pause between ticks, in milliseconds", func() {
+				Default(0)
+			})
+			Required("id")
+		})
+		StreamingResult(Tick)
+		HTTP(func() {
+			GET("/ws/things/{id}/ticks")
+			Param("key")
+			Param("count")
+			Param("delay_ms")
+		})
+	})
+
+	Method("echo_ws", func() {
+		Description("Answers every message over a WebSocket with its text upper-cased and repeated, until the " +
+			"client sends goa's end-of-stream null; then closes with code 1000. The text \"kick\" closes the " +
+			"connection with code 4001 instead.")
+		NoSecurity()
+		Payload(func() {
+			Attribute("prefix", String, "Prepended to every answer")
+		})
+		StreamingPayload(func() {
+			Attribute("text", String, func() {
+				MinLength(1)
+			})
+			Attribute("repeat", Int, func() {
+				Minimum(1)
+				Default(1)
+			})
+			Required("text")
+		})
+		StreamingResult(func() {
+			Attribute("text", String)
+			Attribute("length", Int, "Length of the text received")
+			Required("text", "length")
+		})
+		HTTP(func() {
+			GET("/ws/echo")
+			Param("prefix")
+		})
+	})
+
+	Method("sum_ints", func() {
+		Description("Sums the integers a client streams over a WebSocket and answers once with the total. " +
+			"Authenticates with the JWT in the Authorization header, which a browser WebSocket cannot send.")
+		PayloadWithToken(nil)
+		StreamingPayload(Int)
+		Result(func() {
+			Attribute("sum", Int)
+			Attribute("count", Int)
+			Required("sum", "count")
+		})
+		HTTP(func() {
+			GET("/ws/sum")
+		})
+	})
+
 	Method("get_thing", func() {
 		Description("Returns a thing and echoes the request. The id \"missing\" fails with not_found.")
 		PayloadWithToken(func() {

@@ -40,7 +40,8 @@ func main() {
 		dec           = goahttp.RequestDecoder
 		enc           = goahttp.ResponseEncoder
 	)
-	toysvr.Mount(mux, toysvr.New(toyEndpoints, mux, dec, enc, nil, nil))
+	toysvr.Mount(mux, toysvr.New(toyEndpoints, mux, dec, enc, nil, nil,
+		newUpgrader(), &toysvr.ConnConfigurer{WatchTicksFn: cancelOnClose}))
 	echosvr.Mount(mux, echosvr.New(echoEndpoints, mux, dec, enc, nil, nil))
 
 	ln, err := net.Listen("tcp", *addr)
@@ -83,11 +84,12 @@ type requestHeaders struct {
 
 // recordAuthorization notes whether a request carried an Authorization
 // header, which stream_public_sse reports back, and its Accept header, which
-// stream_or_list checks.
+// stream_or_list checks. It also gives the request a connHolder for the
+// WebSocket methods.
 func recordAuthorization(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seen := requestHeaders{authorization: r.Header.Get("Authorization") != "", accept: r.Header.Get("Accept")}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), requestHeadersKey{}, seen)))
+		next.ServeHTTP(w, withConnHolder(r.WithContext(context.WithValue(r.Context(), requestHeadersKey{}, seen))))
 	})
 }
 

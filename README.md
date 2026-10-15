@@ -257,7 +257,7 @@ if (!result.ok) {
 }
 const stream = result.value;
 stream.send({ text: "hello" }); // validated and encoded; returns a Result, never throws
-stream.end();                   // nothing more to send: goa's end-of-stream null
+stream.end();                   // nothing more to send: goa's end-of-stream null; returns a Result too
 for await (const reply of stream) {
   render(reply); // typed, validated, dates already Date objects
 }
@@ -275,7 +275,7 @@ An unnamed type is declared in the method's file as `<Method>Result` or `<Method
 
 - The `Payload` travels in the upgrade request, a `GET`: path and query parameters (goa allows no body there).
 - Every message is one JSON text frame. A message the server sends that does not match its schema throws `ResponseValidationError` from the loop and closes the socket. `send` returns the validation error of a message that does not match, and sends nothing; on a closed socket it returns a `NetworkError`.
-- `end()` sends the JSON `null` with which a goa client ends its stream; the socket stays open for what the server sends next. A client-streaming method answers with its one result, then the loop ends (goa drops that connection without a close frame; the stream knows to expect it).
+- `end()` sends the JSON `null` with which a goa client ends its stream; the socket stays open for what the server sends next. It returns a `Result` like `send`: a `NetworkError` when the socket is no longer open. Calling it again does nothing, and `send` fails after it with a `NetworkError`, since goa's server reads nothing after the `null`. A client-streaming method answers with its one result, then the loop ends (goa drops that connection without a close frame; the stream knows to expect it).
 - The loop ends when the server closes with code 1000, the way goa ends a stream, and when the client closes: `stream.close(code?, reason?)`, leaving the loop (`break`, `return`, an exception), or aborting `signal`, which closes with 1000 and throws `AbortError` from the loop. Any other close throws a `NetworkError` whose `closeCode` and `closeReason` say why.
 - `stream.closed` resolves with `{ code, reason, wasClean }` once the socket is closed; `stream.socket` is the `WebSocket` itself.
 - `timeoutMs` bounds the wait for the socket to open (`TimeoutError`); an open socket is never cut off.

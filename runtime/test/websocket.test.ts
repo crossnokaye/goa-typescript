@@ -241,6 +241,51 @@ describe("connectWebSocket", () => {
     expect(socket.closedWith?.code).toBe(1000);
   });
 
+  it("returns AbortError, and opens no socket, when the signal aborts while credentials resolve", async () => {
+    const controller = new AbortController();
+    let created = 0;
+    const slowAuth = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return "tok";
+    };
+    const pending = connectWebSocket(
+      client({
+        auth: slowAuth,
+        webSocket: (url) => {
+          created++;
+          return new FakeSocket(url) as unknown as WebSocket;
+        },
+      }),
+      spec,
+      { id: "x" },
+      { signal: controller.signal },
+      serverOnly,
+    );
+    controller.abort();
+    const result = await pending;
+    expect(result.error).toBeInstanceOf(AbortError);
+    expect(created).toBe(0);
+  });
+
+  it("returns AbortError when the signal aborts while the factory runs", async () => {
+    const controller = new AbortController();
+    const pending = connectWebSocket(
+      client({
+        webSocket: (url) => {
+          controller.abort();
+          return new FakeSocket(url) as unknown as WebSocket;
+        },
+      }),
+      spec,
+      { id: "x" },
+      { signal: controller.signal },
+      serverOnly,
+    );
+    const result = await pending;
+    expect(result.error).toBeInstanceOf(AbortError);
+    expect(FakeSocket.last?.closedWith?.code).toBe(1000);
+  });
+
   it("does not connect with an aborted signal", async () => {
     const result = await connectWebSocket(client(), spec, { id: "x" }, { signal: AbortSignal.abort() }, serverOnly);
     expect(result.error).toBeInstanceOf(AbortError);
@@ -348,15 +393,33 @@ describe("WebSocketStream", () => {
     expect(result.error).toMatchObject({ closeCode: 1000 });
   });
 
-  it("end() sends goa's null terminator and keeps receiving", async () => {
+  it("end() sends goa's null terminator once and keeps receiving", async () => {
     const { stream, socket } = await connect(bidi);
     stream.send({ text: "a" });
-    stream.end();
+    expect(stream.end()).toEqual({ ok: true, value: undefined });
+    expect(stream.end()).toEqual({ ok: true, value: undefined });
     expect(socket.sent).toEqual(['{"text":"a"}', "null"]);
     expect(socket.closedWith).toBeUndefined();
     socket.message('{"n":1}');
     socket.serverClose(1000);
     expect(await collect(stream)).toEqual([{ n: 1 }]);
+  });
+
+  it("refuses to send after end()", async () => {
+    const { stream, socket } = await connect(bidi);
+    stream.end();
+    const result = stream.send({ text: "late" });
+    expect(result.error).toBeInstanceOf(NetworkError);
+    expect(result.error?.message).toContain("ended");
+    expect(socket.sent).toEqual(["null"]);
+  });
+
+  it("end() returns a NetworkError on a closed socket", async () => {
+    const { stream, socket } = await connect(bidi);
+    socket.serverClose(1000);
+    await stream.closed;
+    expect(stream.end().error).toMatchObject({ kind: "network", closeCode: 1000 });
+    expect(socket.sent).toEqual([]);
   });
 
   it("ends a client stream after its one result, without waiting for a clean close", async () => {

@@ -101,6 +101,8 @@ export class WebSocketStream<Recv, Send = never> implements AsyncIterable<Recv> 
   #failure: Error | undefined;
   /** closing is true once the client asked to close: the close that follows is not a failure. */
   #closing = false;
+  /** ended is true once end() sent goa's null: the server reads no further message. */
+  #ended = false;
   #done = false;
 
   constructor(socket: WebSocket, codec: WebSocketCodec<Recv, Send>, signal?: AbortSignal) {
@@ -142,6 +144,9 @@ export class WebSocketStream<Recv, Send = never> implements AsyncIterable<Recv> 
     if (!this.#codec.encode) {
       return err(new NetworkError("this method streams no messages to the server"));
     }
+    if (this.#ended) {
+      return err(new NetworkError("the stream was ended: the server reads no message after end()"));
+    }
     if (this.socket.readyState !== OPEN) {
       return err(this.#notOpen());
     }
@@ -160,12 +165,19 @@ export class WebSocketStream<Recv, Send = never> implements AsyncIterable<Recv> 
    * result, then the iteration ends.
    *
    * It only means something for methods that stream a payload; elsewhere the
-   * server ignores it.
+   * server ignores it. Calling it again does nothing; `send` fails after it. It
+   * returns a `NetworkError` when the socket is no longer open.
    */
-  end(): void {
-    if (this.socket.readyState === OPEN) {
-      this.socket.send("null");
+  end(): Result<void, NetworkError> {
+    if (this.#ended) {
+      return ok(undefined);
     }
+    if (this.socket.readyState !== OPEN) {
+      return err(this.#notOpen());
+    }
+    this.#ended = true;
+    this.socket.send("null");
+    return ok(undefined);
   }
 
   /**
@@ -347,6 +359,10 @@ export async function connectWebSocket<R extends z.ZodType | null, S extends z.Z
   if (!prepared.ok) {
     return { ok: false, error: prepared.error };
   }
+  // A credential provider may be slow: the signal can abort meanwhile.
+  if (signal?.aborted) {
+    return { ok: false, error: new AbortError(undefined, { cause: signal.reason }) };
+  }
 
   let socket: WebSocket;
   let url: string;
@@ -361,6 +377,12 @@ export async function connectWebSocket<R extends z.ZodType | null, S extends z.Z
 
   const timeoutMs = callTimeout ?? client.options.timeoutMs;
   const opened = await new Promise<Result<void, TransportError>>((resolve) => {
+    if (signal?.aborted) {
+      // Aborted while the factory ran: the stream has closed the socket already.
+      stream.close(1000, "aborted");
+      resolve(err(new AbortError(undefined, { cause: signal.reason })));
+      return;
+    }
     let timer: ReturnType<typeof setTimeout> | undefined;
     const settle = (result: Result<void, TransportError>): void => {
       socket.removeEventListener("open", onOpen);

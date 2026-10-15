@@ -2,6 +2,7 @@ package tsgen
 
 import (
 	"fmt"
+	"slices"
 
 	"goa.design/goa/v3/codegen"
 	"goa.design/goa/v3/expr"
@@ -41,8 +42,8 @@ func (b *builder) buildWebSocketEndpoint(e *expr.HTTPEndpointExpr, scope, files 
 	ep.ErrorTypeName = scope.Unique(upperFirst(ep.FuncName) + "Error")
 	ep.ErrorTS = "\n  | RequestValidationError\n  | TransportError"
 	for _, he := range e.HTTPErrors {
-		if he.ErrorExpr != nil {
-			ep.WS.DeclaredErrors = appendUnique(ep.WS.DeclaredErrors, he.Name)
+		if he.ErrorExpr != nil && !slices.Contains(ep.WS.DeclaredErrors, he.Name) {
+			ep.WS.DeclaredErrors = append(ep.WS.DeclaredErrors, he.Name)
 		}
 	}
 	ep.SpecTS = endpointSpecLiteral(ep, ep.Accept)
@@ -109,9 +110,14 @@ func (b *builder) buildWebSocket(e *expr.HTTPEndpointExpr, ep *EndpointSpec, sco
 		}
 	}
 
-	// What the browser cannot send.
+	// What the browser cannot send. Basic credentials always travel in
+	// Authorization, though the binding names no location.
 	for _, s := range ep.Security {
-		if s.In == "header" {
+		switch {
+		case s.Kind == "basic":
+			s.In, s.Name = "header", "Authorization"
+			spec.HeaderCredentials = append(spec.HeaderCredentials, s)
+		case s.In == "header":
 			spec.HeaderCredentials = append(spec.HeaderCredentials, s)
 		}
 	}
@@ -124,13 +130,4 @@ func (b *builder) buildWebSocket(e *expr.HTTPEndpointExpr, ep *EndpointSpec, sco
 // isEmpty reports whether an attribute carries nothing.
 func isEmpty(att *expr.AttributeExpr) bool {
 	return att == nil || att.Type == nil || att.Type == expr.Empty
-}
-
-func appendUnique(list []string, s string) []string {
-	for _, x := range list {
-		if x == s {
-			return list
-		}
-	}
-	return append(list, s)
 }

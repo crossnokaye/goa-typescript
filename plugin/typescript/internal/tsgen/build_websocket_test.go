@@ -87,6 +87,14 @@ func TestBuildWebSocketSecurity(t *testing.T) {
 			t.Errorf("doc lacks %q:\n%s", want, doc)
 		}
 	}
+	basic := endpoint(t, svc, "basic")
+	if basic.Request != nil {
+		t.Errorf("the basic credentials are not stripped from the request: %+v", basic.Request)
+	}
+	wantEqual(t, "basic header credentials", len(basic.WS.HeaderCredentials), 1)
+	if doc := webSocketDoc(basic); !strings.Contains(doc, "the `basic` credential, in `Authorization`") {
+		t.Errorf("basic doc does not flag the Authorization header:\n%s", doc)
+	}
 	if strings.Contains(webSocketDoc(keyed), "cannot send headers") {
 		t.Errorf("keyed doc warns about headers it does not use")
 	}

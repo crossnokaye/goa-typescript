@@ -1518,10 +1518,24 @@ var WSClientDSL = func() {
 var WSSecurityDSL = func() {
 	var JWT = JWTSecurity("jwt")
 	var Key = APIKeySecurity("api_key")
+	var Basic = BasicAuthSecurity("basic")
 	Service("svc", func() {
 		Security(JWT)
 		Error("unauthorized")
 		HTTP(func() { Response("unauthorized", StatusUnauthorized) })
+		Method("basic", func() {
+			Description("Basic auth travels in the Authorization header: the browser cannot send it.")
+			Security(Basic)
+			Payload(func() {
+				Username("user", String)
+				Password("pass", String)
+				Required("user", "pass")
+			})
+			StreamingResult(String)
+			HTTP(func() {
+				GET("/basic")
+			})
+		})
 		Method("keyed", func() {
 			Description("An API key in the query string: the browser sends it.")
 			Security(Key)

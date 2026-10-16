@@ -196,6 +196,13 @@ func (s *toyService) GetThing(_ context.Context, p *toy.GetThingPayload) (*toy.T
 	}, nil
 }
 
+func (s *toyService) HeadThing(_ context.Context, p *toy.HeadThingPayload) (*toy.HeadThingResult, error) {
+	if p.ThingID == "missing" {
+		return nil, toy.MakeNotFound(fmt.Errorf("thing %q not found", p.ThingID))
+	}
+	return &toy.HeadThingResult{Etag: `"` + p.ThingID + `-v1"`}, nil
+}
+
 func (s *toyService) GetThingViewed(_ context.Context, p *toy.GetThingViewedPayload) (*toy.ThingWithViews, string, error) {
 	return &toy.ThingWithViews{ID: "viewed", Name: "viewed-thing", Secret: "s3cr3t"}, p.View, nil
 }

@@ -35,7 +35,7 @@ const streamEitherSpec: EndpointSpec = {
 };
 
 /** streamEitherErrors lists the errors the design declares for streamEither, by HTTP status. */
-export const streamEitherErrors = {
+const streamEitherErrors = {
   401: [{ name: 'unauthorized' }],
 } as const;
 

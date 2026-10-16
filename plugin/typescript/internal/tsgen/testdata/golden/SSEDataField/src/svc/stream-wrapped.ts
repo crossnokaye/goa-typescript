@@ -40,7 +40,7 @@ const streamWrappedSpec: EndpointSpec = {
 };
 
 /** streamWrappedErrors lists the errors the design declares for streamWrapped, by HTTP status. */
-export const streamWrappedErrors = {} as const;
+const streamWrappedErrors = {} as const;
 
 /** StreamWrappedError is everything streamWrapped can fail with. */
 export type StreamWrappedError =

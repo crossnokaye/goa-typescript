@@ -44,7 +44,7 @@ const getThingResponses = {
 } as const;
 
 /** getThingErrors lists the errors the design declares for getThing, by HTTP status. */
-export const getThingErrors = {
+const getThingErrors = {
   404: [{ name: 'not_found' }],
 } as const;
 

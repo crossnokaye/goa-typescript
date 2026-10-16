@@ -43,7 +43,7 @@ const getPageResponses = {
 } as const;
 
 /** getPageErrors lists the errors the design declares for getPage, by HTTP status. */
-export const getPageErrors = {} as const;
+const getPageErrors = {} as const;
 
 /** GetPageError is everything getPage can fail with. */
 export type GetPageError =

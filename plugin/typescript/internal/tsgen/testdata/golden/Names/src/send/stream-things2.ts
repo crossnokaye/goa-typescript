@@ -32,7 +32,7 @@ const streamThings2Spec: EndpointSpec = {
 };
 
 /** streamThings2Errors lists the errors the design declares for streamThings2, by HTTP status. */
-export const streamThings2Errors = {} as const;
+const streamThings2Errors = {} as const;
 
 /** StreamThings2Error is everything streamThings2 can fail with. */
 export type StreamThings2Error =

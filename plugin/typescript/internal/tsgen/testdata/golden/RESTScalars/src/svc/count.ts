@@ -34,7 +34,7 @@ const countResponses = {
 } as const;
 
 /** countErrors lists the errors the design declares for count, by HTTP status. */
-export const countErrors = {} as const;
+const countErrors = {} as const;
 
 /** CountError is everything count can fail with. */
 export type CountError =

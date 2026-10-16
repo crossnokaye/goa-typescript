@@ -28,7 +28,7 @@ const pingResponses = {
 } as const;
 
 /** pingErrors lists the errors the design declares for ping, by HTTP status. */
-export const pingErrors = {
+const pingErrors = {
   404: [{ name: 'not_found' }],
 } as const;
 

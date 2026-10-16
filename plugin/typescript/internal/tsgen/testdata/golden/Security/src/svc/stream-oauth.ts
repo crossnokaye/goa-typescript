@@ -34,7 +34,7 @@ const streamOauthSpec: EndpointSpec = {
 };
 
 /** streamOauthErrors lists the errors the design declares for streamOauth, by HTTP status. */
-export const streamOauthErrors = {
+const streamOauthErrors = {
   401: [{ name: 'unauthorized' }],
 } as const;
 

@@ -34,7 +34,7 @@ const namesResponses = {
 } as const;
 
 /** namesErrors lists the errors the design declares for names, by HTTP status. */
-export const namesErrors = {} as const;
+const namesErrors = {} as const;
 
 /** NamesError is everything names can fail with. */
 export type NamesError =

@@ -48,7 +48,7 @@ const streamNamedSpec: EndpointSpec = {
 };
 
 /** streamNamedErrors lists the errors the design declares for streamNamed, by HTTP status. */
-export const streamNamedErrors = {} as const;
+const streamNamedErrors = {} as const;
 
 /** StreamNamedError is everything streamNamed can fail with. */
 export type StreamNamedError =

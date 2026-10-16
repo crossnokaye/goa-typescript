@@ -57,7 +57,7 @@ const submitResponses = {
 } as const;
 
 /** submitErrors lists the errors the design declares for submit, by HTTP status. */
-export const submitErrors = {} as const;
+const submitErrors = {} as const;
 
 /** SubmitError is everything submit can fail with. */
 export type SubmitError =

@@ -32,7 +32,7 @@ const streamFlagSpec: EndpointSpec = {
 };
 
 /** streamFlagErrors lists the errors the design declares for streamFlag, by HTTP status. */
-export const streamFlagErrors = {} as const;
+const streamFlagErrors = {} as const;
 
 /** StreamFlagError is everything streamFlag can fail with. */
 export type StreamFlagError =

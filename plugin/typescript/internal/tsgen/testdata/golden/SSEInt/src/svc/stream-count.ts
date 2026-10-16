@@ -32,7 +32,7 @@ const streamCountSpec: EndpointSpec = {
 };
 
 /** streamCountErrors lists the errors the design declares for streamCount, by HTTP status. */
-export const streamCountErrors = {} as const;
+const streamCountErrors = {} as const;
 
 /** StreamCountError is everything streamCount can fail with. */
 export type StreamCountError =

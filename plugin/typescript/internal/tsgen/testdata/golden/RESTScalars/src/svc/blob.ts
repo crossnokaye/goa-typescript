@@ -35,7 +35,7 @@ const blobResponses = {
 } as const;
 
 /** blobErrors lists the errors the design declares for blob, by HTTP status. */
-export const blobErrors = {} as const;
+const blobErrors = {} as const;
 
 /** BlobError is everything blob can fail with. */
 export type BlobError =

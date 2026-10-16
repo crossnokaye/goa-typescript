@@ -41,7 +41,7 @@ const strictResponses = {
 } as const;
 
 /** strictErrors lists the errors the design declares for strict, by HTTP status. */
-export const strictErrors = {} as const;
+const strictErrors = {} as const;
 
 /** StrictError is everything strict can fail with. */
 export type StrictError =

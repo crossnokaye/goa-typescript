@@ -45,7 +45,7 @@ const createResponses = {
 } as const;
 
 /** createErrors lists the errors the design declares for create, by HTTP status. */
-export const createErrors = {} as const;
+const createErrors = {} as const;
 
 /** CreateError is everything create can fail with. */
 export type CreateError =

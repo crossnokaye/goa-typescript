@@ -41,7 +41,7 @@ const statsResponses = {
 } as const;
 
 /** statsErrors lists the errors the design declares for stats, by HTTP status. */
-export const statsErrors = {
+const statsErrors = {
   404: [{ name: 'not_found' }],
 } as const;
 

@@ -35,7 +35,7 @@ const whenResponses = {
 } as const;
 
 /** whenErrors lists the errors the design declares for when, by HTTP status. */
-export const whenErrors = {} as const;
+const whenErrors = {} as const;
 
 /** WhenError is everything when can fail with. */
 export type WhenError =

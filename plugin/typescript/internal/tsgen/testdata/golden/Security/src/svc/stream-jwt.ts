@@ -43,7 +43,7 @@ const streamJwtSpec: EndpointSpec = {
 };
 
 /** streamJwtErrors lists the errors the design declares for streamJwt, by HTTP status. */
-export const streamJwtErrors = {
+const streamJwtErrors = {
   401: [{ name: 'unauthorized' }],
 } as const;
 

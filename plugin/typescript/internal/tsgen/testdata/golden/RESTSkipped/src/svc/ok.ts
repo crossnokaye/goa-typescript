@@ -34,7 +34,7 @@ const ok2Responses = {
 } as const;
 
 /** ok2Errors lists the errors the design declares for ok2, by HTTP status. */
-export const ok2Errors = {} as const;
+const ok2Errors = {} as const;
 
 /** Ok2Error is everything ok2 can fail with. */
 export type Ok2Error =

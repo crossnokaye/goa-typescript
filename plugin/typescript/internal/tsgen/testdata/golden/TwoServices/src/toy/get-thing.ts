@@ -40,7 +40,7 @@ const getThingResponses = {
 } as const;
 
 /** getThingErrors lists the errors the design declares for getThing, by HTTP status. */
-export const getThingErrors = {} as const;
+const getThingErrors = {} as const;
 
 /** GetThingError is everything getThing can fail with. */
 export type GetThingError =

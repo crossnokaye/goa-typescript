@@ -43,7 +43,7 @@ const streamKeyedSpec: EndpointSpec = {
 };
 
 /** streamKeyedErrors lists the errors the design declares for streamKeyed, by HTTP status. */
-export const streamKeyedErrors = {
+const streamKeyedErrors = {
   401: [{ name: 'unauthorized' }],
 } as const;
 

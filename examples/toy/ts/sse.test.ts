@@ -103,7 +103,6 @@ describe('stream_things_sse: a named type as the whole event', () => {
     // The design's errors are members of the endpoint's error union.
     expectTypeOf<GoaError<'not_found'>>().toMatchTypeOf<toy.StreamThingsSseError>();
     expectTypeOf<GoaError<'bad_upstream'>>().toMatchTypeOf<toy.StreamThingsSseError>();
-    expect(toy.streamThingsSseErrors[404]).toEqual([{ name: 'not_found' }]);
   });
 
   it("returns goa's own validation errors under their name", async () => {

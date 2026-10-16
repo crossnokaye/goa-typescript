@@ -57,7 +57,7 @@ const streamFieldsSpec: EndpointSpec = {
 };
 
 /** streamFieldsErrors lists the errors the design declares for streamFields, by HTTP status. */
-export const streamFieldsErrors = {} as const;
+const streamFieldsErrors = {} as const;
 
 /** StreamFieldsError is everything streamFields can fail with. */
 export type StreamFieldsError =

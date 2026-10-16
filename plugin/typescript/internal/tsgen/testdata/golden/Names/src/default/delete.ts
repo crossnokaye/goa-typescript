@@ -32,7 +32,7 @@ const delete_Spec: EndpointSpec = {
 };
 
 /** delete_Errors lists the errors the design declares for delete_, by HTTP status. */
-export const delete_Errors = {} as const;
+const delete_Errors = {} as const;
 
 /** Delete_Error is everything delete_ can fail with. */
 export type Delete_Error =

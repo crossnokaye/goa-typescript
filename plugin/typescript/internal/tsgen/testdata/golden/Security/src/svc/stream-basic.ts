@@ -43,7 +43,7 @@ const streamBasicSpec: EndpointSpec = {
 };
 
 /** streamBasicErrors lists the errors the design declares for streamBasic, by HTTP status. */
-export const streamBasicErrors = {
+const streamBasicErrors = {
   401: [{ name: 'unauthorized' }],
 } as const;
 

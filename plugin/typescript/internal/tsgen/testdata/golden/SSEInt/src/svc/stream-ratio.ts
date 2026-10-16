@@ -32,7 +32,7 @@ const streamRatioSpec: EndpointSpec = {
 };
 
 /** streamRatioErrors lists the errors the design declares for streamRatio, by HTTP status. */
-export const streamRatioErrors = {} as const;
+const streamRatioErrors = {} as const;
 
 /** StreamRatioError is everything streamRatio can fail with. */
 export type StreamRatioError =

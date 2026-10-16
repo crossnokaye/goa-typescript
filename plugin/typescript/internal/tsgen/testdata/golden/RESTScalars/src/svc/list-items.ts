@@ -35,7 +35,7 @@ const listItemsResponses = {
 } as const;
 
 /** listItemsErrors lists the errors the design declares for listItems, by HTTP status. */
-export const listItemsErrors = {} as const;
+const listItemsErrors = {} as const;
 
 /** ListItemsError is everything listItems can fail with. */
 export type ListItemsError =

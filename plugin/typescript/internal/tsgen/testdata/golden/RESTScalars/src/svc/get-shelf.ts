@@ -29,7 +29,7 @@ const getShelfResponses = {
 } as const;
 
 /** getShelfErrors lists the errors the design declares for getShelf, by HTTP status. */
-export const getShelfErrors = {} as const;
+const getShelfErrors = {} as const;
 
 /** GetShelfError is everything getShelf can fail with. */
 export type GetShelfError =

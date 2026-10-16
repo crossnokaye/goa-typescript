@@ -39,7 +39,7 @@ const deleteThingResponses = {
 } as const;
 
 /** deleteThingErrors lists the errors the design declares for deleteThing, by HTTP status. */
-export const deleteThingErrors = {
+const deleteThingErrors = {
   404: [{ name: 'not_found' }],
 } as const;
 

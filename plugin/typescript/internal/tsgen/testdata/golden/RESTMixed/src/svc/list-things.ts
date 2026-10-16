@@ -58,7 +58,7 @@ const listThingsResponses = {
 } as const;
 
 /** listThingsErrors lists the errors the design declares for listThings, by HTTP status. */
-export const listThingsErrors = {
+const listThingsErrors = {
   404: [{ name: 'not_found' }],
 } as const;
 

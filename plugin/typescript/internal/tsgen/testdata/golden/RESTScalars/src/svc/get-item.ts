@@ -29,7 +29,7 @@ const getItemResponses = {
 } as const;
 
 /** getItemErrors lists the errors the design declares for getItem, by HTTP status. */
-export const getItemErrors = {} as const;
+const getItemErrors = {} as const;
 
 /** GetItemError is everything getItem can fail with. */
 export type GetItemError =

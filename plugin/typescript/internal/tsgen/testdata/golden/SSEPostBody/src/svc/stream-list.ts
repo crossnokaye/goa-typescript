@@ -38,7 +38,7 @@ const streamListSpec: EndpointSpec = {
 };
 
 /** streamListErrors lists the errors the design declares for streamList, by HTTP status. */
-export const streamListErrors = {} as const;
+const streamListErrors = {} as const;
 
 /** StreamListError is everything streamList can fail with. */
 export type StreamListError =

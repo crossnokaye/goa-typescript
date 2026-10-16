@@ -32,7 +32,7 @@ const streamTextSpec: EndpointSpec = {
 };
 
 /** streamTextErrors lists the errors the design declares for streamText, by HTTP status. */
-export const streamTextErrors = {} as const;
+const streamTextErrors = {} as const;
 
 /** StreamTextError is everything streamText can fail with. */
 export type StreamTextError =

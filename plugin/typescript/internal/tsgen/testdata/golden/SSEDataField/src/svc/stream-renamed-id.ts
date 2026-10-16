@@ -27,7 +27,7 @@ const streamRenamedIdSpec: EndpointSpec = {
 };
 
 /** streamRenamedIdErrors lists the errors the design declares for streamRenamedId, by HTTP status. */
-export const streamRenamedIdErrors = {} as const;
+const streamRenamedIdErrors = {} as const;
 
 /** StreamRenamedIdError is everything streamRenamedId can fail with. */
 export type StreamRenamedIdError =

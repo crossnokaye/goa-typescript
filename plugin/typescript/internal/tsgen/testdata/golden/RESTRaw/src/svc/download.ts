@@ -55,7 +55,7 @@ const downloadResponses = {
 } as const;
 
 /** downloadErrors lists the errors the design declares for download, by HTTP status. */
-export const downloadErrors = {} as const;
+const downloadErrors = {} as const;
 
 /** DownloadError is everything download can fail with. */
 export type DownloadError =

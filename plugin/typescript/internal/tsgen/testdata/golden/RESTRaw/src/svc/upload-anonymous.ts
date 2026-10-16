@@ -29,7 +29,7 @@ const uploadAnonymousResponses = {
 } as const;
 
 /** uploadAnonymousErrors lists the errors the design declares for uploadAnonymous, by HTTP status. */
-export const uploadAnonymousErrors = {} as const;
+const uploadAnonymousErrors = {} as const;
 
 /** UploadAnonymousError is everything uploadAnonymous can fail with. */
 export type UploadAnonymousError =

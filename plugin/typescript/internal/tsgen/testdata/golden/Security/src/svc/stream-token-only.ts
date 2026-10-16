@@ -34,7 +34,7 @@ const streamTokenOnlySpec: EndpointSpec = {
 };
 
 /** streamTokenOnlyErrors lists the errors the design declares for streamTokenOnly, by HTTP status. */
-export const streamTokenOnlyErrors = {
+const streamTokenOnlyErrors = {
   401: [{ name: 'unauthorized' }],
 } as const;
 

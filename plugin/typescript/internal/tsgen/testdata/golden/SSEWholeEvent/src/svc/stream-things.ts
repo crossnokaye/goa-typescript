@@ -51,7 +51,7 @@ const streamThingsSpec: EndpointSpec = {
 };
 
 /** streamThingsErrors lists the errors the design declares for streamThings, by HTTP status. */
-export const streamThingsErrors = {
+const streamThingsErrors = {
   404: [{ name: 'not_found' }],
   502: [{ name: 'bad_upstream' }],
 } as const;

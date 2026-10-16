@@ -27,7 +27,7 @@ const watchSpec: EndpointSpec = {
 };
 
 /** watchErrors lists the errors the design declares for watch, by HTTP status. */
-export const watchErrors = {} as const;
+const watchErrors = {} as const;
 
 /** WatchError is everything watch can fail with. */
 export type WatchError =

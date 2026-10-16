@@ -40,7 +40,7 @@ const uploadTaggedResponses = {
 } as const;
 
 /** uploadTaggedErrors lists the errors the design declares for uploadTagged, by HTTP status. */
-export const uploadTaggedErrors = {} as const;
+const uploadTaggedErrors = {} as const;
 
 /** UploadTaggedError is everything uploadTagged can fail with. */
 export type UploadTaggedError =

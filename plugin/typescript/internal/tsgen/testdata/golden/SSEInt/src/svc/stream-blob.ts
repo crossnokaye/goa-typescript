@@ -33,7 +33,7 @@ const streamBlobSpec: EndpointSpec = {
 };
 
 /** streamBlobErrors lists the errors the design declares for streamBlob, by HTTP status. */
-export const streamBlobErrors = {} as const;
+const streamBlobErrors = {} as const;
 
 /** StreamBlobError is everything streamBlob can fail with. */
 export type StreamBlobError =

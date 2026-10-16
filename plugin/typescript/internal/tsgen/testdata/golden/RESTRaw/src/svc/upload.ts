@@ -50,7 +50,7 @@ const uploadResponses = {
 } as const;
 
 /** uploadErrors lists the errors the design declares for upload, by HTTP status. */
-export const uploadErrors = {} as const;
+const uploadErrors = {} as const;
 
 /** UploadError is everything upload can fail with. */
 export type UploadError =

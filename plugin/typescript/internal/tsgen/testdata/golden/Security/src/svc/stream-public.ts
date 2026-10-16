@@ -32,7 +32,7 @@ const streamPublicSpec: EndpointSpec = {
 };
 
 /** streamPublicErrors lists the errors the design declares for streamPublic, by HTTP status. */
-export const streamPublicErrors = {
+const streamPublicErrors = {
   401: [{ name: 'unauthorized' }],
 } as const;
 

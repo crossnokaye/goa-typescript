@@ -46,7 +46,7 @@ const headPageResponses = {
 } as const;
 
 /** headPageErrors lists the errors the design declares for headPage, by HTTP status. */
-export const headPageErrors = {} as const;
+const headPageErrors = {} as const;
 
 /** HeadPageError is everything headPage can fail with. */
 export type HeadPageError =

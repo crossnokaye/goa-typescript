@@ -45,7 +45,7 @@ const streamFilteredSpec: EndpointSpec = {
 };
 
 /** streamFilteredErrors lists the errors the design declares for streamFiltered, by HTTP status. */
-export const streamFilteredErrors = {} as const;
+const streamFilteredErrors = {} as const;
 
 /** StreamFilteredError is everything streamFiltered can fail with. */
 export type StreamFilteredError =

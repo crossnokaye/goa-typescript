@@ -60,7 +60,7 @@ const createThingResponses = {
 } as const;
 
 /** createThingErrors lists the errors the design declares for createThing, by HTTP status. */
-export const createThingErrors = {
+const createThingErrors = {
   409: [{ name: 'conflict', schema: CreateThingConflictDetail }],
   418: [{ name: 'teapot', schema: CreateThingTeapotDetail }],
   422: [{ name: 'invalid', schema: ValidationProblem, headers: { retry_after: { name: 'Retry-After', shape: 'number' } } }],

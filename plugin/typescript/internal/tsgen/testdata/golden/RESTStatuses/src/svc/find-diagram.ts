@@ -42,7 +42,7 @@ const findDiagramResponses = {
 } as const;
 
 /** findDiagramErrors lists the errors the design declares for findDiagram, by HTTP status. */
-export const findDiagramErrors = {} as const;
+const findDiagramErrors = {} as const;
 
 /** FindDiagramError is everything findDiagram can fail with. */
 export type FindDiagramError =

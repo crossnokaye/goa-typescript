@@ -48,7 +48,7 @@ const submitNodeResponses = {
 } as const;
 
 /** submitNodeErrors lists the errors the design declares for submitNode, by HTTP status. */
-export const submitNodeErrors = {} as const;
+const submitNodeErrors = {} as const;
 
 /** SubmitNodeError is everything submitNode can fail with. */
 export type SubmitNodeError =

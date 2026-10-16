@@ -37,7 +37,7 @@ const streamOneSpec: EndpointSpec = {
 };
 
 /** streamOneErrors lists the errors the design declares for streamOne, by HTTP status. */
-export const streamOneErrors = {} as const;
+const streamOneErrors = {} as const;
 
 /** StreamOneError is everything streamOne can fail with. */
 export type StreamOneError =

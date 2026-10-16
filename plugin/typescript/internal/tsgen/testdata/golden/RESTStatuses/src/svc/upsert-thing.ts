@@ -45,7 +45,7 @@ const upsertThingResponses = {
 } as const;
 
 /** upsertThingErrors lists the errors the design declares for upsertThing, by HTTP status. */
-export const upsertThingErrors = {} as const;
+const upsertThingErrors = {} as const;
 
 /** UpsertThingError is everything upsertThing can fail with. */
 export type UpsertThingError =

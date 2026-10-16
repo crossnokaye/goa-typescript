@@ -28,7 +28,7 @@ const downloadPlainResponses = {
 } as const;
 
 /** downloadPlainErrors lists the errors the design declares for downloadPlain, by HTTP status. */
-export const downloadPlainErrors = {} as const;
+const downloadPlainErrors = {} as const;
 
 /** DownloadPlainError is everything downloadPlain can fail with. */
 export type DownloadPlainError =

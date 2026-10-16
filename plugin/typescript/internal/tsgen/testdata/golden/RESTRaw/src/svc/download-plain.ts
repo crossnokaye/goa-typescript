@@ -11,20 +11,20 @@ import {
   type OtherErrorName,
   type RequestOptions,
   send,
-} from "../runtime/index.js";
+} from '../runtime/index.js';
 
 const downloadPlainSpec: EndpointSpec = {
-  method: "GET",
-  path: "/plain",
+  method: 'GET',
+  path: '/plain',
   pathParams: {},
   queryParams: {},
   headerParams: {},
-  accept: "application/json",
+  accept: 'application/json',
   security: [],
 };
 
 const downloadPlainResponses = {
-  200: { body: "raw" },
+  200: { body: 'raw' },
 } as const;
 
 /** downloadPlainErrors lists the errors the design declares for downloadPlain, by HTTP status. */

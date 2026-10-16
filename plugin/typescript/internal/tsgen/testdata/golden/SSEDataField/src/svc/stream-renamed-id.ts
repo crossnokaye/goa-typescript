@@ -13,16 +13,16 @@ import {
   sseDecoder,
   type StreamOptions,
   UnexpectedResponseError,
-} from "../runtime/index.js";
-import { Envelope } from "../types.js";
+} from '../runtime/index.js';
+import { Envelope } from '../types.js';
 
 const streamRenamedIdSpec: EndpointSpec = {
-  method: "GET",
-  path: "/renamed",
+  method: 'GET',
+  path: '/renamed',
   pathParams: {},
   queryParams: {},
   headerParams: {},
-  accept: "text/event-stream",
+  accept: 'text/event-stream',
   security: [],
 };
 
@@ -53,7 +53,7 @@ export async function streamRenamedId(
   if (res.status !== 200) {
     return { ok: false, error: await goaErrorDecoder(streamRenamedIdErrors)(res), response: res };
   }
-  if (!/^text\/event-stream/i.test(res.headers.get("content-type") ?? "") || !res.body) {
+  if (!/^text\/event-stream/i.test(res.headers.get('content-type') ?? '') || !res.body) {
     return { ok: false, error: new UnexpectedResponseError(res, await res.text()), response: res };
   }
   return {
@@ -61,9 +61,9 @@ export async function streamRenamedId(
     value: new EventStream(
       res,
       sseDecoder(Envelope, {
-        encoding: "json",
+        encoding: 'json',
         data: null,
-        id: "eventId",
+        id: 'eventId',
         event: null,
         retry: null,
       }),

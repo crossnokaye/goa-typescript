@@ -137,7 +137,7 @@ func verbatimFile(rel, content string) *codegen.File {
 func importBlock(imp Imports, runtimePath, typesPath string) string {
 	var blocks []string
 	if imp.Zod {
-		blocks = append(blocks, "import * as z from \"zod\";")
+		blocks = append(blocks, "import * as z from 'zod';")
 	}
 	var local []string
 	if len(imp.Runtime) > 0 {

@@ -11,21 +11,21 @@ import {
   type OtherErrorName,
   type RequestOptions,
   send,
-} from "../runtime/index.js";
-import { Shelf } from "../types.js";
+} from '../runtime/index.js';
+import { Shelf } from '../types.js';
 
 const getShelfSpec: EndpointSpec = {
-  method: "GET",
-  path: "/shelf",
+  method: 'GET',
+  path: '/shelf',
   pathParams: {},
   queryParams: {},
   headerParams: {},
-  accept: "application/json",
+  accept: 'application/json',
   security: [],
 };
 
 const getShelfResponses = {
-  200: { body: "fields" },
+  200: { body: 'fields' },
 } as const;
 
 /** getShelfErrors lists the errors the design declares for getShelf, by HTTP status. */

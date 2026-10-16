@@ -2,5 +2,5 @@
 
 /** A service named after a runtime export. */
 
-export * from "./stream-things.js";
-export * from "./stream-things2.js";
+export * from './stream-things.js';
+export * from './stream-things2.js';

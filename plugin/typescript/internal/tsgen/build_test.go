@@ -140,7 +140,7 @@ func TestBuildSSEWholeEvent(t *testing.T) {
 	wantEqual(t, "types", typeNames(pkg), []string{"Event"})
 	event := pkg.Types[0]
 	wantEqual(t, "event kind", event.Kind, TypeObject)
-	if !strings.Contains(event.Zod, `type: z.string().default("thing"),`) || !strings.Contains(event.TSDef, "  type: string;") {
+	if !strings.Contains(event.Zod, `type: z.string().default('thing'),`) || !strings.Contains(event.TSDef, "  type: string;") {
 		t.Errorf("type should be required with a decode default:\n%s\n%s", event.TSDef, event.Zod)
 	}
 }
@@ -295,14 +295,14 @@ func TestBuildErrors(t *testing.T) {
 		{Name: "busy", Status: 503, Default: true, Temporary: true, Timeout: true},
 	})
 	wantEqual(t, "table", ep.ErrorTable, `{
-  400: [{ name: "precondition_failed" }, { name: "gone" }],
-  404: [{ name: "not_found" }],
-  422: [{ name: "invalid", schema: Problem }],
-  503: [{ name: "busy" }],
+  400: [{ name: 'precondition_failed' }, { name: 'gone' }],
+  404: [{ name: 'not_found' }],
+  422: [{ name: 'invalid', schema: Problem }],
+  503: [{ name: 'busy' }],
 } as const`)
 	for _, member := range []string{
-		`GoaError<"precondition_failed">`, `GoaError<"gone">`, `GoaError<"not_found">`,
-		`GoaError<"invalid", Problem>`, `GoaError<"busy">`, "GoaError<OtherErrorName>", "ClientError",
+		`GoaError<'precondition_failed'>`, `GoaError<'gone'>`, `GoaError<'not_found'>`,
+		`GoaError<'invalid', Problem>`, `GoaError<'busy'>`, "GoaError<OtherErrorName>", "ClientError",
 	} {
 		if !strings.Contains(ep.ErrorTS, "\n  | "+member) {
 			t.Errorf("error union lacks %s:%s", member, ep.ErrorTS)

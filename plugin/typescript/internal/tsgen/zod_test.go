@@ -59,7 +59,7 @@ func TestTypeAndSchema(t *testing.T) {
 		{name: "json", att: str(&expr.ValidationExpr{Format: expr.FormatJSON}), ts: "string", zod: "z.string()", note: "format: json"},
 		{name: "rfc1123", att: str(&expr.ValidationExpr{Format: expr.FormatRFC1123}), ts: "string", zod: "z.string()", note: "format: rfc1123"},
 
-		{name: "string enum", att: str(&expr.ValidationExpr{Values: []any{"a", "b"}}), ts: `"a" | "b"`, zod: `z.enum(["a", "b"])`},
+		{name: "string enum", att: str(&expr.ValidationExpr{Values: []any{"a", "b"}}), ts: `'a' | 'b'`, zod: `z.enum(['a', 'b'])`},
 		{
 			name: "int enum", att: &expr.AttributeExpr{Type: expr.Int, Validation: &expr.ValidationExpr{Values: []any{1, 2}}},
 			ts: "1 | 2", zod: "z.literal([1, 2])",
@@ -71,12 +71,12 @@ func TestTypeAndSchema(t *testing.T) {
 		{
 			name: "enum wins over format and length",
 			att:  str(&expr.ValidationExpr{Values: []any{"a"}, Format: expr.FormatUUID, MinLength: ptr(1)}),
-			ts:   `"a"`, zod: `z.enum(["a"])`,
+			ts:   `'a'`, zod: `z.enum(['a'])`,
 		},
 		{
 			name: "string lengths and pattern",
 			att:  str(&expr.ValidationExpr{MinLength: ptr(1), MaxLength: ptr(8), Pattern: `^\d+$`}),
-			ts:   "string", zod: `z.string().min(1).max(8).regex(new RegExp("^\\d+$"))`,
+			ts:   "string", zod: `z.string().min(1).max(8).regex(new RegExp('^\\d+$'))`,
 		},
 		{
 			name: "format with length", att: str(&expr.ValidationExpr{Format: expr.FormatEmail, MaxLength: ptr(64)}),
@@ -114,7 +114,7 @@ func TestTypeAndSchema(t *testing.T) {
 		{
 			name: "array of enum",
 			att:  &expr.AttributeExpr{Type: &expr.Array{ElemType: str(&expr.ValidationExpr{Values: []any{"a", "b"}})}},
-			ts:   `("a" | "b")[]`, zod: `z.array(z.enum(["a", "b"]))`,
+			ts:   `('a' | 'b')[]`, zod: `z.array(z.enum(['a', 'b']))`,
 		},
 		{
 			name: "array keeps element notes",
@@ -143,16 +143,16 @@ func TestTypeAndSchema(t *testing.T) {
 				{Name: "label", Attribute: &expr.AttributeExpr{Type: expr.String}},
 				{Name: "count", Attribute: &expr.AttributeExpr{Type: expr.Int}},
 			}}},
-			ts:  `{ type: "label"; value: string } | { type: "count"; value: number }`,
-			zod: "z.discriminatedUnion(\"type\", [\n  z.object({ type: z.literal(\"label\"), value: z.string() }),\n  z.object({ type: z.literal(\"count\"), value: z.int() }),\n])",
+			ts:  `{ type: 'label'; value: string } | { type: 'count'; value: number }`,
+			zod: "z.discriminatedUnion('type', [\n  z.object({ type: z.literal('label'), value: z.string() }),\n  z.object({ type: z.literal('count'), value: z.int() }),\n])",
 		},
 		{
 			name: "union with custom keys",
 			att: &expr.AttributeExpr{Type: &expr.Union{TypeName: "pay", TypeKey: "kind", ValueKey: "details", Values: []*expr.NamedAttributeExpr{
 				{Name: "cash", Attribute: &expr.AttributeExpr{Type: expr.Int}},
 			}}},
-			ts:  `{ kind: "cash"; details: number }`,
-			zod: "z.discriminatedUnion(\"kind\", [\n  z.object({ kind: z.literal(\"cash\"), details: z.int() }),\n])",
+			ts:  `{ kind: 'cash'; details: number }`,
+			zod: "z.discriminatedUnion('kind', [\n  z.object({ kind: z.literal('cash'), details: z.int() }),\n])",
 		},
 	}
 	for _, tc := range cases {
@@ -219,7 +219,7 @@ func TestDefaultLiteral(t *testing.T) {
 		ok   bool
 	}{
 		{"none", &expr.AttributeExpr{Type: expr.String}, "", false},
-		{"string", &expr.AttributeExpr{Type: expr.String, DefaultValue: `a "b"`}, `"a \"b\""`, true},
+		{"string", &expr.AttributeExpr{Type: expr.String, DefaultValue: `a "b"`}, `'a "b"'`, true},
 		{"int", &expr.AttributeExpr{Type: expr.Int, DefaultValue: 3}, "3", true},
 		{"zero", &expr.AttributeExpr{Type: expr.Int, DefaultValue: 0}, "0", true},
 		{"float", &expr.AttributeExpr{Type: expr.Float64, DefaultValue: 0.25}, "0.25", true},
@@ -227,10 +227,10 @@ func TestDefaultLiteral(t *testing.T) {
 		{
 			"date-time",
 			&expr.AttributeExpr{Type: expr.String, Validation: &expr.ValidationExpr{Format: expr.FormatDateTime}, DefaultValue: "2026-01-01T00:00:00Z"},
-			`new Date("2026-01-01T00:00:00Z")`, true,
+			`new Date('2026-01-01T00:00:00Z')`, true,
 		},
 		{"bytes", &expr.AttributeExpr{Type: expr.Bytes, DefaultValue: []byte("x")}, "", false},
-		{"array", &expr.AttributeExpr{Type: stringsOf, DefaultValue: []any{"a", "b"}}, `["a","b"]`, true},
+		{"array", &expr.AttributeExpr{Type: stringsOf, DefaultValue: []any{"a", "b"}}, `['a','b']`, true},
 		{"array of date-time", &expr.AttributeExpr{Type: timesOf, DefaultValue: []any{"2026-01-01T00:00:00Z"}}, "", false},
 		{
 			"map",
@@ -238,9 +238,9 @@ func TestDefaultLiteral(t *testing.T) {
 				Type:         &expr.Map{KeyType: &expr.AttributeExpr{Type: expr.String}, ElemType: &expr.AttributeExpr{Type: expr.Int}},
 				DefaultValue: map[any]any{"a": 1},
 			},
-			`{"a":1}`, true,
+			`{'a':1}`, true,
 		},
-		{"any", &expr.AttributeExpr{Type: expr.Any, DefaultValue: map[string]any{"k": []any{1, "x"}}}, `{"k":[1,"x"]}`, true},
+		{"any", &expr.AttributeExpr{Type: expr.Any, DefaultValue: map[string]any{"k": []any{1, "x"}}}, `{'k':[1,'x']}`, true},
 		{"object", &expr.AttributeExpr{Type: &expr.Object{}, DefaultValue: map[string]any{}}, "", false},
 	}
 	for _, tc := range cases {

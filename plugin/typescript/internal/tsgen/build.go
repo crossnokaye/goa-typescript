@@ -507,17 +507,17 @@ func endpointSpecLiteral(ep *EndpointSpec, accept string) string {
 	}
 	switch {
 	case ep.RawBody:
-		b.WriteString("  body: { kind: \"raw\" },\n")
+		b.WriteString("  body: { kind: 'raw' },\n")
 	case req.Body.Kind == BodyFields:
 		fields := make([]string, len(req.Body.Fields))
 		for i, f := range req.Body.Fields {
 			fields[i] = tsString(f)
 		}
-		fmt.Fprintf(&b, "  body: { kind: \"fields\", fields: [%s] },\n", strings.Join(fields, ", "))
+		fmt.Fprintf(&b, "  body: { kind: 'fields', fields: [%s] },\n", strings.Join(fields, ", "))
 	case req.Body.Kind == BodyAttr:
-		fmt.Fprintf(&b, "  body: { kind: \"attr\", attr: %s },\n", tsString(req.Body.Attr))
+		fmt.Fprintf(&b, "  body: { kind: 'attr', attr: %s },\n", tsString(req.Body.Attr))
 	case req.Body.Kind == BodyWhole:
-		b.WriteString("  body: { kind: \"whole\" },\n")
+		b.WriteString("  body: { kind: 'whole' },\n")
 	}
 	fmt.Fprintf(&b, "  accept: %s,\n", tsString(accept))
 	if len(ep.Security) == 0 {
@@ -526,7 +526,7 @@ func endpointSpecLiteral(ep *EndpointSpec, accept string) string {
 		b.WriteString("  security: [\n")
 		for _, s := range ep.Security {
 			if s.Kind == "basic" {
-				fmt.Fprintf(&b, "    { scheme: %s, kind: \"basic\" },\n", tsString(s.Scheme))
+				fmt.Fprintf(&b, "    { scheme: %s, kind: 'basic' },\n", tsString(s.Scheme))
 				continue
 			}
 			fmt.Fprintf(&b, "    { scheme: %s, kind: %s, in: %s, name: %s },\n",

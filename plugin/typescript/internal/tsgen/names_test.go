@@ -45,10 +45,10 @@ func TestPropKeyAndString(t *testing.T) {
 		"snake_case":   "snake_case",
 		"$ref":         "$ref",
 		"class":        "class",
-		"needs-quotes": `"needs-quotes"`,
-		"1st":          `"1st"`,
-		"with space":   `"with space"`,
-		"":             `""`,
+		"needs-quotes": `'needs-quotes'`,
+		"1st":          `'1st'`,
+		"with space":   `'with space'`,
+		"":             `''`,
 	}
 	for in, want := range keys {
 		if got := tsPropKey(in); got != want {
@@ -56,13 +56,18 @@ func TestPropKeyAndString(t *testing.T) {
 		}
 	}
 	strs := map[string]string{
-		"plain":        `"plain"`,
-		`say "hi"`:     `"say \"hi\""`,
-		`back\slash`:   `"back\\slash"`,
-		"line\nbreak":  `"line\nbreak"`,
-		"<a&b>":        `"<a&b>"`,
-		"caf\u00e9":    "\"caf\u00e9\"",
-		"sep\u2028end": `"sep\u2028end"`,
+		"plain":        `'plain'`,
+		"it's":         `'it\'s'`,
+		`say "hi"`:     `'say "hi"'`,
+		`back\slash`:   `'back\\slash'`,
+		"line\nbreak":  `'line\nbreak'`,
+		"a\x00b":       `'a\0b'`,
+		"a\x001":       `'a\u00001'`,
+		"a\x01b":       `'a\u0001b'`,
+		"<a&b>/":       `'<a&b>/'`,
+		"caf\u00e9":    "'caf\u00e9'",
+		"sep\u2028end": `'sep\u2028end'`,
+		"sep\u2029end": `'sep\u2029end'`,
 	}
 	for in, want := range strs {
 		if got := tsString(in); got != want {

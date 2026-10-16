@@ -24,7 +24,7 @@ export async function {{ .FuncName }}(
   if (res.status !== 200) {
     return { ok: false, error: await goaErrorDecoder({{ .Endpoint.ErrorsName }})(res), response: res };
   }
-  if (!/^text\/event-stream/i.test(res.headers.get("content-type") ?? "") || !res.body) {
+  if (!/^text\/event-stream/i.test(res.headers.get('content-type') ?? '') || !res.body) {
     return { ok: false, error: new UnexpectedResponseError(res, await res.text()), response: res };
   }
   return {

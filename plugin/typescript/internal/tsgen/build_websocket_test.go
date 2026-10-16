@@ -26,7 +26,7 @@ func TestBuildWebSocketServer(t *testing.T) {
 	wantEqual(t, "result", ep.ResultTS, "WebSocketStream<Tick, never>")
 	wantEqual(t, "declared errors", ep.WS.DeclaredErrors, []string{"not_found"})
 	wantEqual(t, "errors", ep.ErrorTS, "\n  | RequestValidationError\n  | TransportError")
-	if !strings.Contains(ep.SpecTS, `accept: "",`) {
+	if !strings.Contains(ep.SpecTS, `accept: '',`) {
 		t.Errorf("spec sends an Accept header:\n%s", ep.SpecTS)
 	}
 	wantEqual(t, "type imports", ep.Imports.Types, []string{"Tick"})

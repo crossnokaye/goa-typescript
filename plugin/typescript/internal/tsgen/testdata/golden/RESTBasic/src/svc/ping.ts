@@ -11,30 +11,30 @@ import {
   type OtherErrorName,
   type RequestOptions,
   send,
-} from "../runtime/index.js";
+} from '../runtime/index.js';
 
 const pingSpec: EndpointSpec = {
-  method: "GET",
-  path: "/api/ping",
+  method: 'GET',
+  path: '/api/ping',
   pathParams: {},
   queryParams: {},
   headerParams: {},
-  accept: "application/json",
+  accept: 'application/json',
   security: [],
 };
 
 const pingResponses = {
-  204: { body: "none" },
+  204: { body: 'none' },
 } as const;
 
 /** pingErrors lists the errors the design declares for ping, by HTTP status. */
 export const pingErrors = {
-  404: [{ name: "not_found" }],
+  404: [{ name: 'not_found' }],
 } as const;
 
 /** PingError is everything ping can fail with. */
 export type PingError =
-  | GoaError<"not_found">
+  | GoaError<'not_found'>
   | GoaError<OtherErrorName>
   | ClientError;
 

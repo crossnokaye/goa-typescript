@@ -13,16 +13,16 @@ import {
   sseDecoder,
   type StreamOptions,
   UnexpectedResponseError,
-} from "../runtime/index.js";
-import { Validated } from "../types.js";
+} from '../runtime/index.js';
+import { Validated } from '../types.js';
 
 const watchSpec: EndpointSpec = {
-  method: "GET",
-  path: "/watch",
+  method: 'GET',
+  path: '/watch',
   pathParams: {},
   queryParams: {},
   headerParams: {},
-  accept: "text/event-stream",
+  accept: 'text/event-stream',
   security: [],
 };
 
@@ -53,7 +53,7 @@ export async function watch(
   if (res.status !== 200) {
     return { ok: false, error: await goaErrorDecoder(watchErrors)(res), response: res };
   }
-  if (!/^text\/event-stream/i.test(res.headers.get("content-type") ?? "") || !res.body) {
+  if (!/^text\/event-stream/i.test(res.headers.get('content-type') ?? '') || !res.body) {
     return { ok: false, error: new UnexpectedResponseError(res, await res.text()), response: res };
   }
   return {
@@ -61,7 +61,7 @@ export async function watch(
     value: new EventStream(
       res,
       sseDecoder(Validated, {
-        encoding: "json",
+        encoding: 'json',
         data: null,
         id: null,
         event: null,

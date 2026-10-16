@@ -42,8 +42,8 @@ func TestBuildNamedAttrs(t *testing.T) {
 	wantEqual(t, "enum kind", enum.Kind, TypeAlias)
 	wantEqual(t, "enum goa name", enum.GoaName, "ColorKey")
 	wantEqual(t, "enum description", enum.Description, "The key of the widget's color.")
-	wantEqual(t, "enum ts", enum.TSDef, `"blue" | "green"`)
-	wantEqual(t, "enum zod", enum.Zod, `z.enum(["blue", "green"])`)
+	wantEqual(t, "enum ts", enum.TSDef, `'blue' | 'green'`)
+	wantEqual(t, "enum zod", enum.Zod, `z.enum(['blue', 'green'])`)
 	if enum.Request != nil {
 		t.Errorf("an enum has no input-side variant, got %+v", enum.Request)
 	}

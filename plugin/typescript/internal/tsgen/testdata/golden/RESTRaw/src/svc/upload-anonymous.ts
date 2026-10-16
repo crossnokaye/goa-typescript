@@ -11,21 +11,21 @@ import {
   type OtherErrorName,
   type RequestOptions,
   send,
-} from "../runtime/index.js";
+} from '../runtime/index.js';
 
 const uploadAnonymousSpec: EndpointSpec = {
-  method: "POST",
-  path: "/files",
+  method: 'POST',
+  path: '/files',
   pathParams: {},
   queryParams: {},
   headerParams: {},
-  body: { kind: "raw" },
-  accept: "application/json",
+  body: { kind: 'raw' },
+  accept: 'application/json',
   security: [],
 };
 
 const uploadAnonymousResponses = {
-  204: { body: "none" },
+  204: { body: 'none' },
 } as const;
 
 /** uploadAnonymousErrors lists the errors the design declares for uploadAnonymous, by HTTP status. */

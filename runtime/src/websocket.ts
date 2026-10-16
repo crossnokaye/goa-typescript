@@ -1,6 +1,6 @@
-import type * as z from "zod";
+import type * as z from 'zod';
 
-import { prepareRequest, type Client, type EndpointSpec, type WebSocketFactory } from "./client.js";
+import { prepareRequest, type Client, type EndpointSpec, type WebSocketFactory } from './client.js';
 import {
   AbortError,
   NetworkError,
@@ -8,9 +8,9 @@ import {
   type ResponseValidationError,
   TimeoutError,
   type TransportError,
-} from "./errors.js";
-import { err, ok, type CallResult, type Result } from "./result.js";
-import { decodeJSON, encodeJSON } from "./schema.js";
+} from './errors.js';
+import { err, ok, type CallResult, type Result } from './result.js';
+import { decodeJSON, encodeJSON } from './schema.js';
 
 /** WebSocketOptions tune a single WebSocket call. */
 export interface WebSocketOptions {
@@ -113,16 +113,16 @@ export class WebSocketStream<Recv, Send = never> implements AsyncIterable<Recv> 
     this.closed = new Promise((resolve) => {
       resolveClosed = resolve;
     });
-    socket.addEventListener("message", (event: MessageEvent) => {
+    socket.addEventListener('message', (event: MessageEvent) => {
       if (this.#done) {
         return;
       }
       this.#queue.push(event.data);
       this.#wake();
     });
-    socket.addEventListener("close", (event: CloseEvent) => {
+    socket.addEventListener('close', (event: CloseEvent) => {
       this.#closeInfo = { code: event.code, reason: event.reason, wasClean: event.wasClean };
-      signal?.removeEventListener("abort", this.#onAbort);
+      signal?.removeEventListener('abort', this.#onAbort);
       resolveClosed(this.#closeInfo);
       this.#wake();
     });
@@ -130,7 +130,7 @@ export class WebSocketStream<Recv, Send = never> implements AsyncIterable<Recv> 
       if (signal.aborted) {
         this.#abort();
       } else {
-        signal.addEventListener("abort", this.#onAbort, { once: true });
+        signal.addEventListener('abort', this.#onAbort, { once: true });
       }
     }
   }
@@ -142,10 +142,10 @@ export class WebSocketStream<Recv, Send = never> implements AsyncIterable<Recv> 
    */
   send(msg: Send): Result<void, RequestValidationError | NetworkError> {
     if (!this.#codec.encode) {
-      return err(new NetworkError("this method streams no messages to the server"));
+      return err(new NetworkError('this method streams no messages to the server'));
     }
     if (this.#ended) {
-      return err(new NetworkError("the stream was ended: the server reads no message after end()"));
+      return err(new NetworkError('the stream was ended: the server reads no message after end()'));
     }
     if (this.socket.readyState !== OPEN) {
       return err(this.#notOpen());
@@ -176,7 +176,7 @@ export class WebSocketStream<Recv, Send = never> implements AsyncIterable<Recv> 
       return err(this.#notOpen());
     }
     this.#ended = true;
-    this.socket.send("null");
+    this.socket.send('null');
     return ok(undefined);
   }
 
@@ -227,17 +227,17 @@ export class WebSocketStream<Recv, Send = never> implements AsyncIterable<Recv> 
 
   /** read decodes one frame, closing the socket when the stream cannot go on. */
   #read(data: unknown): Recv {
-    if (typeof data !== "string") {
-      this.close(1000, "binary frame");
-      throw new NetworkError("unexpected binary WebSocket frame: goa sends JSON text frames");
+    if (typeof data !== 'string') {
+      this.close(1000, 'binary frame');
+      throw new NetworkError('unexpected binary WebSocket frame: goa sends JSON text frames');
     }
     if (!this.#codec.decode) {
-      this.close(1000, "unexpected message");
-      throw new NetworkError("unexpected WebSocket message: the method declares no result");
+      this.close(1000, 'unexpected message');
+      throw new NetworkError('unexpected WebSocket message: the method declares no result');
     }
     const value = this.#codec.decode(data);
     if (!value.ok) {
-      this.close(1000, "invalid message");
+      this.close(1000, 'invalid message');
       throw value.error;
     }
     if (this.#codec.single) {
@@ -251,16 +251,16 @@ export class WebSocketStream<Recv, Send = never> implements AsyncIterable<Recv> 
     if (this.#done) {
       return;
     }
-    this.#failure = new AbortError("stream aborted", { cause: this.#signal?.reason });
+    this.#failure = new AbortError('stream aborted', { cause: this.#signal?.reason });
     this.#queue.length = 0;
-    this.#closeSocket(1000, "aborted");
+    this.#closeSocket(1000, 'aborted');
     this.#wake();
   }
 
   #finish(): void {
     this.#done = true;
     this.#queue.length = 0;
-    this.#signal?.removeEventListener("abort", this.#onAbort);
+    this.#signal?.removeEventListener('abort', this.#onAbort);
     this.#wake();
   }
 
@@ -281,12 +281,12 @@ export class WebSocketStream<Recv, Send = never> implements AsyncIterable<Recv> 
   #notOpen(): NetworkError {
     const info = this.#closeInfo;
     return info
-      ? new NetworkError("the WebSocket is closed", { closeCode: info.code, closeReason: info.reason })
-      : new NetworkError("the WebSocket is closing");
+      ? new NetworkError('the WebSocket is closed', { closeCode: info.code, closeReason: info.reason })
+      : new NetworkError('the WebSocket is closing');
   }
 
   #closedError(info: WebSocketCloseInfo): NetworkError {
-    const why = info.reason ? `: ${info.reason}` : "";
+    const why = info.reason ? `: ${info.reason}` : '';
     return new NetworkError(`WebSocket closed with code ${info.code}${why}`, {
       closeCode: info.code,
       closeReason: info.reason,
@@ -316,18 +316,18 @@ export function webSocketCodec<R extends z.ZodType | null, S extends z.ZodType |
 export function webSocketURL(url: string): string {
   const base = (globalThis as { location?: { href?: string } }).location?.href;
   const resolved = new URL(url, base);
-  if (resolved.protocol === "http:") {
-    resolved.protocol = "ws:";
-  } else if (resolved.protocol === "https:") {
-    resolved.protocol = "wss:";
+  if (resolved.protocol === 'http:') {
+    resolved.protocol = 'ws:';
+  } else if (resolved.protocol === 'https:') {
+    resolved.protocol = 'wss:';
   }
   return resolved.href;
 }
 
 const defaultFactory: WebSocketFactory = (url, protocols) => {
   const WebSocketImpl = (globalThis as { WebSocket?: typeof WebSocket }).WebSocket;
-  if (typeof WebSocketImpl !== "function") {
-    throw new TypeError("no global WebSocket: set ClientOptions.webSocket");
+  if (typeof WebSocketImpl !== 'function') {
+    throw new TypeError('no global WebSocket: set ClientOptions.webSocket');
   }
   return new WebSocketImpl(url, protocols);
 };
@@ -368,9 +368,11 @@ export async function connectWebSocket<R extends z.ZodType | null, S extends z.Z
   let url: string;
   try {
     url = webSocketURL(prepared.value.url);
-    socket = (client.options.webSocket ?? defaultFactory)(url, protocols, { headers: prepared.value.headers });
+    socket = (client.options.webSocket ?? defaultFactory)(url, protocols, {
+      headers: prepared.value.headers,
+    });
   } catch (cause) {
-    const message = cause instanceof Error ? cause.message : "cannot open a WebSocket";
+    const message = cause instanceof Error ? cause.message : 'cannot open a WebSocket';
     return { ok: false, error: new NetworkError(message, { cause }) };
   }
   const stream = new WebSocketStream(socket, webSocketCodec(mapping), signal);
@@ -379,15 +381,15 @@ export async function connectWebSocket<R extends z.ZodType | null, S extends z.Z
   const opened = await new Promise<Result<void, TransportError>>((resolve) => {
     if (signal?.aborted) {
       // Aborted while the factory ran: the stream has closed the socket already.
-      stream.close(1000, "aborted");
+      stream.close(1000, 'aborted');
       resolve(err(new AbortError(undefined, { cause: signal.reason })));
       return;
     }
     let timer: ReturnType<typeof setTimeout> | undefined;
     const settle = (result: Result<void, TransportError>): void => {
-      socket.removeEventListener("open", onOpen);
-      socket.removeEventListener("close", onClose);
-      signal?.removeEventListener("abort", onAbort);
+      socket.removeEventListener('open', onOpen);
+      socket.removeEventListener('close', onClose);
+      signal?.removeEventListener('abort', onAbort);
       if (timer !== undefined) {
         clearTimeout(timer);
       }
@@ -404,15 +406,15 @@ export async function connectWebSocket<R extends z.ZodType | null, S extends z.Z
         ),
       );
     const onAbort = (): void => {
-      stream.close(1000, "aborted");
+      stream.close(1000, 'aborted');
       settle(err(new AbortError(undefined, { cause: signal?.reason })));
     };
-    socket.addEventListener("open", onOpen);
-    socket.addEventListener("close", onClose);
-    signal?.addEventListener("abort", onAbort, { once: true });
+    socket.addEventListener('open', onOpen);
+    socket.addEventListener('close', onClose);
+    signal?.addEventListener('abort', onAbort, { once: true });
     if (timeoutMs && timeoutMs > 0) {
       timer = setTimeout(() => {
-        stream.close(1000, "timeout");
+        stream.close(1000, 'timeout');
         settle(err(new TimeoutError(`WebSocket not open within ${timeoutMs}ms`)));
       }, timeoutMs);
     }
@@ -427,6 +429,6 @@ export async function connectWebSocket<R extends z.ZodType | null, S extends z.Z
 
 /** redact drops the query string, which may hold a credential, from a URL for messages. */
 function redact(url: string): string {
-  const q = url.indexOf("?");
+  const q = url.indexOf('?');
   return q === -1 ? url : url.slice(0, q);
 }

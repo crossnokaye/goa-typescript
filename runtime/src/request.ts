@@ -6,19 +6,19 @@
 /** formatScalar renders a primitive the way goa's Go client does. */
 function formatScalar(value: unknown): string {
   switch (typeof value) {
-    case "string":
+    case 'string':
       return value;
-    case "number":
-    case "boolean":
-    case "bigint":
+    case 'number':
+    case 'boolean':
+    case 'bigint':
       return String(value);
     default:
-      return JSON.stringify(value) ?? "";
+      return JSON.stringify(value) ?? '';
   }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -60,10 +60,10 @@ export function encodePathParam(value: unknown): string {
   return encodeURIComponent(formatScalar(value));
 }
 
-/** encodeHeaderValue renders a header value; arrays are joined with ", ". */
+/** encodeHeaderValue renders a header value; arrays are joined with ', '. */
 export function encodeHeaderValue(value: unknown): string {
   if (Array.isArray(value)) {
-    return value.map(formatScalar).join(", ");
+    return value.map(formatScalar).join(', ');
   }
   return formatScalar(value);
 }
@@ -87,14 +87,14 @@ export function buildURL(
   const path = pathTemplate.replace(/\{(\*?)([^}]+)\}/g, (_match, wildcard: string, name: string) => {
     const value = pathParams[name];
     if (wildcard) {
-      return formatScalar(value).split("/").map(encodeURIComponent).join("/");
+      return formatScalar(value).split('/').map(encodeURIComponent).join('/');
     }
     return encodePathParam(value);
   });
-  let url = base.replace(/\/+$/, "") + (path.startsWith("/") ? path : `/${path}`);
+  let url = base.replace(/\/+$/, '') + (path.startsWith('/') ? path : `/${path}`);
   const search = query?.toString();
   if (search) {
-    url += (url.includes("?") ? "&" : "?") + search;
+    url += (url.includes('?') ? '&' : '?') + search;
   }
   return url;
 }

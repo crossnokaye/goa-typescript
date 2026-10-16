@@ -3,8 +3,7 @@
  * union on `ok`. Nothing in the client throws except `unwrap`/`unwrapAsync`.
  */
 export type Result<T, E = unknown> =
-  | { ok: true; value: T; error?: never }
-  | { ok: false; value?: never; error: E };
+  { ok: true; value: T; error?: never } | { ok: false; value?: never; error: E };
 
 /**
  * CallResult is what a generated function returns: a `Result` with the fetch
@@ -50,6 +49,8 @@ export function unwrap<R extends Result<unknown, unknown>>(result: R): OkValue<R
 }
 
 /** unwrapAsync awaits a Result and returns the success value or throws the error. */
-export async function unwrapAsync<R extends Result<unknown, unknown>>(result: Promise<R>): Promise<OkValue<R>> {
+export async function unwrapAsync<R extends Result<unknown, unknown>>(
+  result: Promise<R>,
+): Promise<OkValue<R>> {
   return unwrap(await result);
 }

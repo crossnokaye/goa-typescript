@@ -15,10 +15,10 @@ import {
   toy,
   unwrap,
   unwrapAsync,
-} from "toy-client";
-import { describe, expect, expectTypeOf, it } from "vitest";
+} from 'toy-client';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
-import { client, collect } from "./helpers.js";
+import { client, collect } from './helpers.js';
 
 /** spy records every request the client sends. */
 function spy(): { middleware: Middleware; requests: Request[] } {
@@ -40,32 +40,32 @@ function call<Req, Res>(fn: Endpoint<Req, Res>, c: Client, payload: Req, o?: Req
   return unwrapAsync(fn(c, payload, o));
 }
 
-describe("EndpointError", () => {
+describe('EndpointError', () => {
   it("is what every function's error union narrows to", () => {
     expectTypeOf<toy.GetThingError>().toExtend<EndpointError>();
     expectTypeOf<toy.CreateThingError>().toExtend<EndpointError>();
     expectTypeOf<toy.ListThingsError>().toExtend<EndpointError>();
     expectTypeOf<toy.StreamThingsSseError>().toExtend<EndpointError>();
     expectTypeOf<ClientError>().toExtend<EndpointError>();
-    expectTypeOf<GoaError<"not_found">>().toExtend<EndpointError>();
+    expectTypeOf<GoaError<'not_found'>>().toExtend<EndpointError>();
     expectTypeOf<Error>().not.toExtend<EndpointError>();
   });
 
-  it("types a formatter shared by every endpoint", async () => {
+  it('types a formatter shared by every endpoint', async () => {
     const seen: string[] = [];
-    const report = (e: EndpointError) => seen.push(e.kind === "goa" ? `${e.name}:${e.status}` : e.kind);
-    const missing = await toy.getThing(client(), { id: "missing" });
+    const report = (e: EndpointError) => seen.push(e.kind === 'goa' ? `${e.name}:${e.status}` : e.kind);
+    const missing = await toy.getThing(client(), { id: 'missing' });
     if (!missing.ok) report(missing.error);
-    const invalid = await toy.createThing(client(), { name: "bad" });
+    const invalid = await toy.createThing(client(), { name: 'bad' });
     if (!invalid.ok) report(invalid.error);
-    const unreachable = await toy.listThings(client({ baseURL: "http://127.0.0.1:1" }));
+    const unreachable = await toy.listThings(client({ baseURL: 'http://127.0.0.1:1' }));
     if (!unreachable.ok) report(unreachable.error);
-    expect(seen).toEqual(["not_found:404", "invalid:422", "network"]);
+    expect(seen).toEqual(['not_found:404', 'invalid:422', 'network']);
   });
 });
 
-describe("one call shape", () => {
-  it("takes the payload second whatever the method declares", () => {
+describe('one call shape', () => {
+  it('takes the payload second whatever the method declares', () => {
     expectTypeOf(toy.getThing).parameter(1).toEqualTypeOf<toy.GetThingPayload>();
     expectTypeOf(toy.getThingViewed).parameter(1).toEqualTypeOf<toy.GetThingViewedPayload | undefined>();
     expectTypeOf(toy.listThings).parameter(1).toEqualTypeOf<undefined>();
@@ -80,48 +80,48 @@ describe("one call shape", () => {
     void toy.getThing(client());
   });
 
-  it("lets a payload-less function be called with the client alone, or with options", async () => {
+  it('lets a payload-less function be called with the client alone, or with options', async () => {
     const seen = spy();
     const things = await unwrapAsync(toy.listThings(client({ middleware: [seen.middleware] })));
     expect(things).toHaveLength(2);
     const signal = AbortSignal.timeout(5_000);
     const again = await toy.listThings(client({ middleware: [seen.middleware] }), undefined, { signal });
     expect(unwrap(again)).toEqual(things);
-    expect(seen.requests.map((r) => r.url.endsWith("/things"))).toEqual([true, true]);
+    expect(seen.requests.map((r) => r.url.endsWith('/things'))).toEqual([true, true]);
   });
 
-  it("lets an all-optional payload be omitted", async () => {
+  it('lets an all-optional payload be omitted', async () => {
     const seen = spy();
     const viewed = await unwrapAsync(toy.getThingViewed(client({ middleware: [seen.middleware] })));
-    expect(viewed).toEqual({ id: "viewed", name: "viewed-thing" });
+    expect(viewed).toEqual({ id: 'viewed', name: 'viewed-thing' });
     expect(unwrap(await toy.getThingViewed(client(), {}))).toEqual(viewed);
     // The omitted payload encodes as {} and the server applies its defaults.
-    expect(new URL(seen.requests[0]!.url).search).toBe("");
+    expect(new URL(seen.requests[0]!.url).search).toBe('');
     const events = await collect(await unwrapAsync(toy.streamViewedSse(client())));
     expect(events).toHaveLength(1);
   });
 
-  it("fits one wrapper type for a payload-less, an optional-payload and a payload function", async () => {
+  it('fits one wrapper type for a payload-less, an optional-payload and a payload function', async () => {
     const c = client();
     const things = await call(toy.listThings, c, undefined);
     expect(things).toHaveLength(2);
     const viewed = await call(toy.getThingViewed, c, undefined, { signal: AbortSignal.timeout(5_000) });
-    expect(viewed.id).toBe("viewed");
-    const one = await call(toy.getThing, c, { id: "abc" });
-    expect(one.thing.name).toBe("full-thing");
+    expect(viewed.id).toBe('viewed');
+    const one = await call(toy.getThing, c, { id: 'abc' });
+    expect(one.thing.name).toBe('full-thing');
     // An SSE function has the same shape, with options that extend RequestOptions.
     const stream = await call(toy.streamCountSse, c, undefined);
     expect(await collect(stream)).toEqual([1, 2, 3]);
     // The wrapper's types come from the function, not from the call.
-    expectTypeOf(call(toy.getThing, c, { id: "abc" })).resolves.toEqualTypeOf<ThingReply>();
+    expectTypeOf(call(toy.getThing, c, { id: 'abc' })).resolves.toEqualTypeOf<ThingReply>();
     expectTypeOf(call(toy.listThings, c, undefined)).resolves.toEqualTypeOf<ThingWithViews[]>();
   });
 
-  it("keeps the raw-body shape, with the body after the payload", async () => {
+  it('keeps the raw-body shape, with the body after the payload', async () => {
     expectTypeOf(toy.uploadThing).parameters.toEqualTypeOf<
       [client: Client, payload: toy.UploadThingPayload, body: BodyInit, options?: RequestOptions]
     >();
-    const uploaded = await unwrapAsync(toy.uploadThing(client(), { id: "abc" }, "bytes"));
+    const uploaded = await unwrapAsync(toy.uploadThing(client(), { id: 'abc' }, 'bytes'));
     expect(uploaded.size).toBe(5);
   });
 });

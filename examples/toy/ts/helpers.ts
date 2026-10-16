@@ -1,21 +1,21 @@
-import { type Client, type ClientOptions, createClient } from "toy-client";
+import { type Client, type ClientOptions, createClient } from 'toy-client';
 
 function env(name: string): string {
   const value = process.env[name];
   if (!value) {
     throw new Error(
       `${name} is not set: start the toy server (go run ./cmd/toy) and pass its address, ` +
-        "or run the pipeline with `go test ./plugin/typescript` from the repository root",
+        'or run the pipeline with `go test ./plugin/typescript` from the repository root',
     );
   }
   return value;
 }
 
 /** baseURL is the address the toy server printed on startup. */
-export const baseURL = env("TOY_BASE_URL");
+export const baseURL = env('TOY_BASE_URL');
 
 /** token is the credential the toy server accepts for both of its schemes. */
-export const token = env("TOY_TOKEN");
+export const token = env('TOY_TOKEN');
 
 /** client returns a client for the toy server, authenticated unless told otherwise. */
 export function client(options: Partial<ClientOptions> = {}): Client {

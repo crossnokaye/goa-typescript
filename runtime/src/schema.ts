@@ -1,6 +1,6 @@
-import * as z from "zod";
+import * as z from 'zod';
 
-import { isAbort } from "./client.js";
+import { isAbort } from './client.js';
 import {
   AbortError,
   asErrorResult,
@@ -11,8 +11,8 @@ import {
   ResponseValidationError,
   type TransportError,
   UnexpectedResponseError,
-} from "./errors.js";
-import { type CallResult, err, ok, type Result } from "./result.js";
+} from './errors.js';
+import { type CallResult, err, ok, type Result } from './result.js';
 
 /** dateTime maps goa `Format(FormatDateTime)` strings (RFC 3339, any offset) to `Date`. */
 export function dateTime() {
@@ -75,7 +75,7 @@ export function nullAsAbsent<T extends z.ZodType>(schema: T) {
 /** ErrorResultSchema validates goa's default error body. */
 export const ErrorResultSchema = z.object({
   name: z.string(),
-  id: z.string().default(""),
+  id: z.string().default(''),
   message: z.string(),
   temporary: z.boolean().default(false),
   timeout: z.boolean().default(false),
@@ -136,16 +136,16 @@ export function encodeJSON<T extends z.ZodType>(
 export function invalidJSON(input: string, cause: unknown): ResponseValidationError {
   const reason = cause instanceof Error ? cause.message : String(cause);
   return new ResponseValidationError(
-    [{ code: "custom", path: [], message: `invalid JSON: ${reason}`, input }],
+    [{ code: 'custom', path: [], message: `invalid JSON: ${reason}`, input }],
     { cause },
   );
 }
 
 /**
  * HeaderShape is the kind of value a response header carries. goa writes
- * numbers and booleans as text and joins the elements of an array with ", ".
+ * numbers and booleans as text and joins the elements of an array with ', '.
  */
-export type HeaderShape = "string" | "number" | "boolean" | "string[]" | "number[]" | "boolean[]";
+export type HeaderShape = 'string' | 'number' | 'boolean' | 'string[]' | 'number[]' | 'boolean[]';
 
 /** ResponseHeader maps a response header onto an attribute. */
 export interface ResponseHeader {
@@ -160,24 +160,24 @@ export type ResponseHeaders = Readonly<Record<string, ResponseHeader>>;
 /** parseHeader converts a header value to the shape the design gives it. */
 export function parseHeader(value: string, shape: HeaderShape): unknown {
   switch (shape) {
-    case "string":
+    case 'string':
       return value;
-    case "number": {
+    case 'number': {
       // An unparseable number stays a string so that the schema reports it.
-      const n = value.trim() === "" ? Number.NaN : Number(value);
+      const n = value.trim() === '' ? Number.NaN : Number(value);
       return Number.isNaN(n) ? value : n;
     }
-    case "boolean": {
+    case 'boolean': {
       const v = value.trim().toLowerCase();
-      return v === "true" ? true : v === "false" ? false : value;
+      return v === 'true' ? true : v === 'false' ? false : value;
     }
     default: {
       const elem = shape.slice(0, -2) as HeaderShape;
-      if (value.trim() === "") {
+      if (value.trim() === '') {
         return [];
       }
       // An element that contains a comma does not survive; goa has the same limit.
-      return value.split(",").map((item) => parseHeader(item.trim(), elem));
+      return value.split(',').map((item) => parseHeader(item.trim(), elem));
     }
   }
 }
@@ -204,7 +204,10 @@ export interface ErrorTableEntry {
 /** ErrorTable lists an endpoint's declared errors by HTTP status code. */
 export type ErrorTable = Readonly<Record<number, readonly ErrorTableEntry[]>>;
 
-type EntryError<E> = E extends { readonly name: infer N extends string; readonly schema: infer S extends z.ZodType }
+type EntryError<E> = E extends {
+  readonly name: infer N extends string;
+  readonly schema: infer S extends z.ZodType;
+}
   ? GoaError<N, z.output<S>>
   : E extends { readonly name: infer N extends string }
     ? GoaError<N>
@@ -232,10 +235,11 @@ export function goaErrorDecoder<const T extends ErrorTable>(
 ) => Promise<
   DeclaredGoaError<T> | GoaError<OtherErrorName> | UnexpectedResponseError | ResponseValidationError
 > {
-  type Out = DeclaredGoaError<T> | GoaError<OtherErrorName> | UnexpectedResponseError | ResponseValidationError;
+  type Out =
+    DeclaredGoaError<T> | GoaError<OtherErrorName> | UnexpectedResponseError | ResponseValidationError;
   return async (response) => {
     const text = await response.text();
-    const contentType = response.headers.get("content-type") ?? "";
+    const contentType = response.headers.get('content-type') ?? '';
     let body: unknown = text;
     let parsed = false;
     if (/\bjson\b|vnd\.goa\.error/i.test(contentType)) {
@@ -248,12 +252,12 @@ export function goaErrorDecoder<const T extends ErrorTable>(
     }
     const goa = parsed ? asErrorResult(body) : undefined;
     const entries = table[response.status] ?? [];
-    const header = response.headers.get("goa-error");
+    const header = response.headers.get('goa-error');
     const name = header ?? goa?.name ?? (entries.length === 1 ? entries[0]!.name : undefined);
     const entry = name === undefined ? undefined : entries.find((e) => e.name === name);
 
     if (entry?.schema) {
-      if (entry.headers && (isRecord(body) || text === "")) {
+      if (entry.headers && (isRecord(body) || text === '')) {
         // The attributes mapped to headers are missing from the body.
         const merged: Record<string, unknown> = isRecord(body) ? { ...body } : {};
         readHeaders(merged, response.headers, entry.headers);
@@ -265,8 +269,7 @@ export function goaErrorDecoder<const T extends ErrorTable>(
       if (!detail.ok) {
         return detail.error;
       }
-      const message =
-        isRecordWithMessage(body) ? body.message : `${entry.name}: HTTP ${response.status}`;
+      const message = isRecordWithMessage(body) ? body.message : `${entry.name}: HTTP ${response.status}`;
       return new GoaError({ name: entry.name, message, body, response, detail: detail.value }) as Out;
     }
     if (goa && name !== undefined) {
@@ -300,17 +303,17 @@ export interface ResponseTableEntry {
    * JSON of the result itself and "none" nothing. A "raw" body is not read: it
    * is left on the Response for the caller.
    */
-  readonly body: "fields" | "attr" | "whole" | "none" | "raw";
+  readonly body: 'fields' | 'attr' | 'whole' | 'none' | 'raw';
   /** attr is the JSON key of the attribute an "attr" body holds. */
   readonly attr?: string;
   /**
    * nullAs is what a "whole" body of `null` stands for. A Go service encodes a
    * nil slice or map that way.
    */
-  readonly nullAs?: "array" | "map";
+  readonly nullAs?: 'array' | 'map';
   /**
    * scalar is true when the result is not an object: the single header, or
-   * the body, is then the value itself. The header is listed under the key "".
+   * the body, is then the value itself. The header is listed under the key ''.
    */
   readonly scalar?: boolean;
   /** headers are the result attributes that travel in response headers. */
@@ -361,11 +364,11 @@ export async function decodeResponse<E>(
 
     let wire: unknown;
     switch (entry.body) {
-      case "fields":
-      case "attr":
-      case "whole": {
+      case 'fields':
+      case 'attr':
+      case 'whole': {
         const text = await response.text();
-        if (!isJSONContentType(response.headers.get("content-type"))) {
+        if (!isJSONContentType(response.headers.get('content-type'))) {
           return fail(new UnexpectedResponseError(response, text));
         }
         let json: unknown;
@@ -374,22 +377,22 @@ export async function decodeResponse<E>(
         } catch (cause) {
           return fail(invalidJSON(text, cause));
         }
-        if (entry.body === "attr") {
+        if (entry.body === 'attr') {
           // goa writes null for an unset attribute.
           wire = json === null || entry.attr === undefined ? {} : { [entry.attr]: json };
-        } else if (entry.body === "whole" && json === null && entry.nullAs) {
-          wire = entry.nullAs === "array" ? [] : {};
+        } else if (entry.body === 'whole' && json === null && entry.nullAs) {
+          wire = entry.nullAs === 'array' ? [] : {};
         } else {
           wire = json;
         }
         break;
       }
-      case "none":
+      case 'none':
         // Nothing to read; release the connection.
         void response.body?.cancel().catch(() => undefined);
         wire = entry.scalar ? undefined : {};
         break;
-      case "raw":
+      case 'raw':
         wire = entry.scalar ? undefined : {};
         break;
     }
@@ -398,7 +401,7 @@ export async function decodeResponse<E>(
       return { ok: true, value: undefined, response };
     }
     if (entry.scalar) {
-      const header = entry.headers?.[""];
+      const header = entry.headers?.[''];
       const value = header ? response.headers.get(header.name) : null;
       if (header && value !== null) {
         wire = parseHeader(value, header.shape);
@@ -421,22 +424,26 @@ export async function decodeResponse<E>(
     if (isAbort(cause)) {
       return fail(new AbortError(undefined, { cause }));
     }
-    return fail(new NetworkError(cause instanceof Error ? cause.message : "network error", { cause }));
+    return fail(new NetworkError(cause instanceof Error ? cause.message : 'network error', { cause }));
   }
 }
 
 /** isJSONContentType reports whether a Content-Type is JSON: `application/json` or a `+json` suffix. */
 export function isJSONContentType(contentType: string | null): boolean {
-  const mediaType = (contentType ?? "").split(";")[0]!.trim().toLowerCase();
-  return mediaType === "application/json" || mediaType.endsWith("+json");
+  const mediaType = (contentType ?? '').split(';')[0]!.trim().toLowerCase();
+  return mediaType === 'application/json' || mediaType.endsWith('+json');
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isRecordWithMessage(value: unknown): value is { message: string } {
-  return typeof value === "object" && value !== null && typeof (value as { message?: unknown }).message === "string";
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { message?: unknown }).message === 'string'
+  );
 }
 
 function base64ToBytes(text: string): Uint8Array {
@@ -450,7 +457,7 @@ function base64ToBytes(text: string): Uint8Array {
 
 /** bytesToBase64 encodes bytes as padded standard base64, as Go's encoding/json does. */
 export function bytesToBase64(value: Uint8Array): string {
-  let binary = "";
+  let binary = '';
   const chunk = 0x8000;
   for (let i = 0; i < value.length; i += chunk) {
     binary += String.fromCharCode(...value.subarray(i, i + chunk));

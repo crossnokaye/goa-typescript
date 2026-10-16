@@ -1,8 +1,7 @@
 package tsgen
 
 import (
-	"bytes"
-	"encoding/json"
+	"fmt"
 	"regexp"
 	"strings"
 	"unicode"
@@ -159,17 +158,51 @@ func tsPropKey(key string) string {
 	return tsString(key)
 }
 
-// tsString renders a double-quoted TypeScript string literal.
+// tsString renders a single-quoted TypeScript string literal.
 func tsString(s string) string {
-	var b bytes.Buffer
-	enc := json.NewEncoder(&b)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(s); err != nil {
-		panic(err) // bug: strings always encode
+	var b strings.Builder
+	b.Grow(len(s) + 2)
+	b.WriteByte('\'')
+	rs := []rune(s)
+	for i, r := range rs {
+		switch r {
+		case '\\':
+			b.WriteString(`\\`)
+		case '\'':
+			b.WriteString(`\'`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		case '\b':
+			b.WriteString(`\b`)
+		case '\f':
+			b.WriteString(`\f`)
+		case '\v':
+			b.WriteString(`\v`)
+		case 0:
+			// \0 followed by a digit would read as a legacy octal escape.
+			if i+1 < len(rs) && rs[i+1] >= '0' && rs[i+1] <= '9' {
+				b.WriteString(`\u0000`)
+			} else {
+				b.WriteString(`\0`)
+			}
+		case '\u2028', '\u2029':
+			// These end a line in older JavaScript parsers, so they are always
+			// escaped.
+			fmt.Fprintf(&b, `\u%04x`, r)
+		default:
+			if r < 0x20 || r == 0x7f {
+				fmt.Fprintf(&b, `\u%04x`, r)
+			} else {
+				b.WriteRune(r)
+			}
+		}
 	}
-	// encoding/json escapes U+2028 and U+2029, which would end a line in older
-	// JavaScript parsers.
-	return strings.TrimSuffix(b.String(), "\n")
+	b.WriteByte('\'')
+	return b.String()
 }
 
 // jsdoc renders a JSDoc block for the given text at the given indentation, or

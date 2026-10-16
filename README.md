@@ -69,21 +69,21 @@ gen/ts/
 The package is TypeScript source, not a build: `package.json` exports point at `.ts` files, and relative imports use the `.js` suffix that bundler module resolution maps back to them.
 
 ```ts
-import { createClient, toy, unwrapAsync, type Thing } from "toy-client";
-import { streamThingsSse } from "toy-client/toy"; // same function, importable on its own
-import { Thing as ThingSchema } from "toy-client/types";
+import { createClient, toy, unwrapAsync, type Thing } from 'toy-client';
+import { streamThingsSse } from 'toy-client/toy'; // same function, importable on its own
+import { Thing as ThingSchema } from 'toy-client/types';
 ```
 
 ### Client configuration
 
 ```ts
-import { createClient } from "toy-client";
+import { createClient } from 'toy-client';
 
 const client = createClient({
-  baseURL: "https://api.example.com", // a path prefix is kept; a relative URL works in a browser
+  baseURL: 'https://api.example.com', // a path prefix is kept; a relative URL works in a browser
   auth: () => getAccessToken(),       // string or function, sync or async, asked on every call
   timeoutMs: 10_000,                  // bounds the wait for response headers (or for a WebSocket to open); streams are not cut off
-  headers: { "X-Client": "web" },
+  headers: { 'X-Client': 'web' },
   // webSocket: (url, protocols, init) => ..., // replaces the global WebSocket; see Streaming methods (WebSocket)
   middleware: [
     async (req, next) => {
@@ -100,7 +100,7 @@ Middleware wraps `fetch`, so it applies to REST and SSE functions; a WebSocket h
 **Credentials.** The attributes a design marks with `Token`, `AccessToken`, `APIKey`, `Username` and `Password` are left out of the request types. The client fills them in from `auth`, in the header or query parameter the design maps them to:
 
 - a bare provider is used for every security scheme;
-- `auth: { jwt: getToken, api_key: "k" }` selects a provider by scheme name;
+- `auth: { jwt: getToken, api_key: 'k' }` selects a provider by scheme name;
 - a provider that returns `undefined` sends the request without that credential;
 - a bearer token gets the `Bearer ` prefix unless it already contains a space; basic credentials are `username:password`.
 
@@ -123,15 +123,15 @@ So a wrapper typed `(client, payload, options?) => Promise<CallResult<Res, Endpo
 A method without streaming becomes a function `fn(client, payload?, options?)` that resolves to the method's result:
 
 ```ts
-import { toy } from "toy-client";
+import { toy } from 'toy-client';
 
-const result = await toy.getThing(client, { id: "abc" }, { signal });
+const result = await toy.getThing(client, { id: 'abc' }, { signal });
 if (!result.ok) {
   return handle(result.error); // see Errors
 }
 result.value;                        // ThingReply: decoded and validated, dates already Date objects
 result.response.status;              // the fetch Response, for the status and the headers
-result.response.headers.get("etag");
+result.response.headers.get('etag');
 
 await toy.getThingViewed(client);                      // every attribute is optional: the payload may be omitted
 await toy.listThings(client, undefined, { signal });   // no payload: undefined holds its place
@@ -149,7 +149,7 @@ await toy.listThings(client, undefined, { signal });   // no payload: undefined 
 | `Cookie(...)` in a `Response` | the attribute is never set: script cannot read `Set-Cookie` |
 | `Body("attr")` | the body is that attribute |
 | several `Response`s | one value type; `result.response.status` says which response it was |
-| `Tag("outcome", "created")` | the client sets `outcome` to `"created"` for that response, as goa's Go client does |
+| `Tag("outcome", "created")` | the client sets `outcome` to `'created'` for that response, as goa's Go client does |
 
 **Several statuses.** goa picks the response from the result's tag attribute and leaves that attribute out of the body. The client puts it back, so both views agree:
 
@@ -157,7 +157,7 @@ await toy.listThings(client, undefined, { signal });   // no payload: undefined 
 const result = await toy.upsertThing(client, { id, name });
 if (result.ok) {
   result.response.status; // 200 or 201
-  result.value.outcome;   // "updated" or "created"
+  result.value.outcome;   // 'updated' or 'created'
 }
 ```
 
@@ -181,7 +181,7 @@ await toy.uploadThing(client, { id, content_type: file.type }, file);
 
 When the method has no payload the function still takes one, typed `undefined`, so that `body` stays in its place: `upload(client, undefined, file)`. The same holds for a raw upload whose payload attributes are all optional: `payload` stays required there, because TypeScript does not allow an optional parameter before a required one.
 
-A `Blob` (so a `File`), an `ArrayBuffer`, `FormData` and a string work everywhere. A `ReadableStream` is sent with `duplex: "half"`, which Safari and Firefox do not support. No `Content-Type` is set unless the design maps a payload attribute to that header; `fetch` derives one from a `Blob` or a string.
+A `Blob` (so a `File`), an `ArrayBuffer`, `FormData` and a string work everywhere. A `ReadableStream` is sent with `duplex: 'half'`, which Safari and Firefox do not support. No `Content-Type` is set unless the design maps a payload attribute to that header; `fetch` derives one from a `Blob` or a string.
 
 **A plain result and a stream** (`Result` and `StreamingResult` on one method). Two functions in one file: `streamOrList()` sends `Accept: application/json` and returns the plain result, `streamOrListStream()` is the [SSE function](#streaming-methods-sse). They share the request type and the error union.
 
@@ -200,9 +200,9 @@ Things worth knowing:
 A method with `StreamingResult` and `ServerSentEvents()` becomes a function `fn(client, payload?, options?)`, shaped like a [REST function](#rest-methods), that resolves to an async-iterable `EventStream`:
 
 ```ts
-import { toy } from "toy-client";
+import { toy } from 'toy-client';
 
-const result = await toy.streamThingsSse(client, { id: "abc" }, { signal });
+const result = await toy.streamThingsSse(client, { id: 'abc' }, { signal });
 if (!result.ok) {
   return handle(result.error);
 }
@@ -235,7 +235,7 @@ while (!signal.aborted) {
       if (signal.aborted) break;
       report(e);
     }
-  } else if (result.error.kind === "goa" && !result.error.temporary) {
+  } else if (result.error.kind === 'goa' && !result.error.temporary) {
     throw result.error; // not worth retrying
   }
   await sleep(backoff());
@@ -249,14 +249,14 @@ When the design names the payload attribute that carries the ID (`SSERequestID("
 A method that streams over a WebSocket (it declares a `StreamingPayload`, or a `StreamingResult` without `ServerSentEvents()`) becomes a function `fn(client, payload?, options?)`, shaped like the [others](#client-configuration), that resolves once the socket is open to a `WebSocketStream<Recv, Send>` ([ADR 0005](docs/adr/0005-websocket-over-the-native-api.md)):
 
 ```ts
-import { toy } from "toy-client";
+import { toy } from 'toy-client';
 
-const result = await toy.echoWs(client, { prefix: ">" }, { signal });
+const result = await toy.echoWs(client, { prefix: '>' }, { signal });
 if (!result.ok) {
   return handle(result.error); // a NetworkError when the server refused the connection
 }
 const stream = result.value;
-stream.send({ text: "hello" }); // validated and encoded; returns a Result, never throws
+stream.send({ text: 'hello' }); // validated and encoded; returns a Result, never throws
 stream.end();                   // nothing more to send: goa's end-of-stream null; returns a Result too
 for await (const reply of stream) {
   render(reply); // typed, validated, dates already Date objects
@@ -286,7 +286,7 @@ An unnamed type is declared in the method's file as `<Method>Result` or `<Method
 - **No headers.** The browser API sends no custom header. Credentials the design maps to the query string, like `Param("key:api_key")` for an API key, work as for any function. Credentials mapped to a header (a JWT in `Authorization`, the default; an API key header; basic auth) and payload attributes mapped with `Header(...)` are not sent: the function's documentation lists them. In a browser, map the credential to a query parameter or authenticate with a cookie. Elsewhere, set `ClientOptions.webSocket`, a factory that replaces the global `WebSocket` the way `fetch` replaces the global fetch; its third argument carries the headers the call would send:
 
   ```ts
-  import WebSocket from "ws";
+  import WebSocket from 'ws';
 
   const client = createClient({
     baseURL,
@@ -308,9 +308,9 @@ Not supported: reconnection (call again), binary frames (goa sends text), backpr
 Every type the design declares with `Type` or `ResultType` gets one TypeScript type and one Zod schema **with the same name**, the usual Zod idiom:
 
 ```ts
-import { Thing, decode, decodeJSON, encode } from "toy-client";
+import { Thing, decode, decodeJSON, encode } from 'toy-client';
 
-const thing: Thing = { id, kind: "widget", enabled: true }; // the type
+const thing: Thing = { id, kind: 'widget', enabled: true }; // the type
 const parsed = decode(Thing, json);                          // the schema: wire -> local, Result<Thing, ...>
 const fromText = decodeJSON(Thing, text);
 const wire = encode(Thing, thing);                           // local -> wire, validated
@@ -326,13 +326,13 @@ Attribute("color_key", String, func() {
 ```
 
 ```ts
-export type ColorKey = "blue" | "green";
-export const ColorKey = z.enum(["blue", "green"]) satisfies z.ZodType<ColorKey>;
+export type ColorKey = 'blue' | 'green';
+export const ColorKey = z.enum(['blue', 'green']) satisfies z.ZodType<ColorKey>;
 
 export type Widget = { color_key: ColorKey; /* ... */ };
 ```
 
-An inline object attribute cannot be named this way (declare a `Type` for it; `goa gen` says so), and a `Default` stays with the parent, which is what makes the attribute optional on the request side. Without a name, the usual TypeScript idioms reach an inline type: `Widget["color_key"]` for a required attribute, `NonNullable<Routine["presentation"]>` for an optional one.
+An inline object attribute cannot be named this way (declare a `Type` for it; `goa gen` says so), and a `Default` stays with the parent, which is what makes the attribute optional on the request side. Without a name, the usual TypeScript idioms reach an inline type: `Widget['color_key']` for a required attribute, `NonNullable<Routine['presentation']>` for an optional one.
 
 | goa | TypeScript | Notes |
 |---|---|---|
@@ -346,7 +346,7 @@ An inline object attribute cannot be named this way (declare a `Type` for it; `g
 | `Any` | `unknown` | |
 | `ArrayOf(T)`, `MapOf(K, T)` | `T[]`, `Record<string, T>` | |
 | `Enum(...)` | union of literals | closed: an unknown value fails validation |
-| `OneOf(...)` | `{ type: "a"; value: A } \| { type: "b"; value: B }` | the envelope goa puts on the wire; key names follow `oneof:type:field` / `oneof:value:field` |
+| `OneOf(...)` | `{ type: 'a'; value: A } \| { type: 'b'; value: B }` | the envelope goa puts on the wire; key names follow `oneof:type:field` / `oneof:value:field` |
 | `Pattern`, `Minimum`, `MaxLength`, ... | | enforced by the schema, on requests and on responses |
 
 Things worth knowing:
@@ -375,7 +375,7 @@ type CallResult<T, E> =
 Every function exports its own error union. `EndpointError` is the type every union is assignable to, for code that handles errors from more than one endpoint:
 
 ```ts
-import type { EndpointError } from "toy-client";
+import type { EndpointError } from 'toy-client';
 
 type QueryOptions<T> = UseQueryOptions<T, EndpointError>;
 function toast(e: EndpointError) { /* ... */ }
@@ -385,21 +385,21 @@ Every member has a string `kind`:
 
 | `kind` | Class | Meaning |
 |---|---|---|
-| `"goa"` | `GoaError<Name, Detail>` | the service returned an error; `name` is the goa error name |
-| `"network"`, `"abort"`, `"timeout"` | `NetworkError`, `AbortError`, `TimeoutError` | no response; a WebSocket's `NetworkError` carries `closeCode` and `closeReason` |
-| `"request_validation"` | `RequestValidationError` | the request does not satisfy the design; nothing was sent |
-| `"response_validation"` | `ResponseValidationError` | the response does not satisfy the design |
-| `"unexpected_response"` | `UnexpectedResponseError` | a status or body the design does not describe (a proxy's 502 page, say) |
+| `'goa'` | `GoaError<Name, Detail>` | the service returned an error; `name` is the goa error name |
+| `'network'`, `'abort'`, `'timeout'` | `NetworkError`, `AbortError`, `TimeoutError` | no response; a WebSocket's `NetworkError` carries `closeCode` and `closeReason` |
+| `'request_validation'` | `RequestValidationError` | the request does not satisfy the design; nothing was sent |
+| `'response_validation'` | `ResponseValidationError` | the response does not satisfy the design |
+| `'unexpected_response'` | `UnexpectedResponseError` | a status or body the design does not describe (a proxy's 502 page, say) |
 
 ```ts
 const result = await toy.streamThingsSse(client, { id });
 if (!result.ok) {
   const e = result.error; // toy.StreamThingsSseError
-  if (e.kind === "goa") {
+  if (e.kind === 'goa') {
     switch (e.name) {
-      case "not_found": // names declared in the design autocomplete
+      case 'not_found': // names declared in the design autocomplete
         return notFound();
-      case "unauthorized":
+      case 'unauthorized':
         return signIn();
     }
     if (e.fault) reportServerBug(e.id, e.message);
@@ -417,14 +417,14 @@ Use `isGoaError(e, name)` to reach the detail. Comparing `e.name` is not enough 
 ```ts
 const result = await toy.createThing(client, { name });
 if (!result.ok) {
-  if (isGoaError(result.error, "invalid")) {
+  if (isGoaError(result.error, 'invalid')) {
     result.error.detail.field;       // ValidationProblem
     result.error.detail.retry_after; // from the Retry-After header
   }
 }
 ```
 
-The narrowing needs the function's error union to pick from, so it works on `result.error`. In a `catch` block the value is `unknown`: `isGoaError(e, "invalid")` still checks the name, and `e.detail` is `unknown`.
+The narrowing needs the function's error union to pick from, so it works on `result.error`. In a `catch` block the value is `unknown`: `isGoaError(e, 'invalid')` still checks the name, and `e.detail` is `unknown`.
 
 ### Consuming from a pnpm workspace
 

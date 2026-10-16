@@ -46,7 +46,7 @@ The browser `WebSocket` API constrains what a client can do with that protocol. 
 ### Negative / breaking
 
 - In a browser, header credentials do not reach the server, and the default goa JWT scheme is a header. A service that wants browser WebSocket clients maps the credential to a query parameter or relies on cookies.
-- Declared goa errors cannot be told apart from a network failure, and `result.response` carries nothing; code that branches on `result.error.kind === "goa"` never sees one from a WebSocket function.
+- Declared goa errors cannot be told apart from a network failure, and `result.response` carries nothing; code that branches on `result.error.kind === 'goa'` never sees one from a WebSocket function.
 - `send` reports a closed socket, or a stream already ended, as a `NetworkError` beside the validation error, where the browser API would drop the message silently. `end()` reports a closed socket the same way.
 - Every generated client carries one more runtime file (about 400 lines).
 
@@ -57,7 +57,7 @@ The browser `WebSocket` API constrains what a client can do with that protocol. 
 
 ## Alternatives considered
 
-1. **Subprotocol tricks to carry a token** (`new WebSocket(url, ["bearer", token])`). goa's upgrader does not read `Sec-WebSocket-Protocol` as a credential, so it would need server changes; it also leaks the token into logs of proxies that record the header.
+1. **Subprotocol tricks to carry a token** (`new WebSocket(url, ['bearer', token])`). goa's upgrader does not read `Sec-WebSocket-Protocol` as a credential, so it would need server changes; it also leaks the token into logs of proxies that record the header.
 2. **Fetching a pre-flight request** to learn the handshake error. A second request is not the handshake: it can succeed where the upgrade fails and doubles the cost of every connection.
 3. **A library such as `ws` as a dependency** of the generated package. It does not run in a browser, and ADR 0001 keeps `zod` the only dependency. The factory lets Node callers bring it.
 4. **Typed `GoaError`s from a factory that can see the response.** No portable API exposes the handshake response, `ws` included without its non-standard `unexpected-response` event; the union stays honest instead.

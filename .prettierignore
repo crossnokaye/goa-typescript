@@ -1,0 +1,4 @@
+plugin/typescript/internal/tsgen/testdata/golden/
+examples/toy/gen/
+node_modules
+pnpm-lock.yaml

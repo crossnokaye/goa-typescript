@@ -2,5 +2,5 @@
 
 /** A service named after a reserved word. */
 
-export * from "./watch.js";
-export * from "./delete.js";
+export * from './watch.js';
+export * from './delete.js';

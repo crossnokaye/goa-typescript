@@ -11,25 +11,25 @@ import {
   type OtherErrorName,
   type RequestOptions,
   send,
-} from "../runtime/index.js";
-import { Item } from "../types.js";
+} from '../runtime/index.js';
+import { Item } from '../types.js';
 
 const getItemSpec: EndpointSpec = {
-  method: "GET",
-  path: "/item",
+  method: 'GET',
+  path: '/item',
   pathParams: {},
   queryParams: {},
   headerParams: {},
-  accept: "application/json",
+  accept: 'application/json',
   security: [],
 };
 
 const getItemResponses = {
-  200: { body: "fields" },
+  200: { body: 'fields' },
 } as const;
 
 /** getItemErrors lists the errors the design declares for getItem, by HTTP status. */
-export const getItemErrors = {} as const;
+const getItemErrors = {} as const;
 
 /** GetItemError is everything getItem can fail with. */
 export type GetItemError =

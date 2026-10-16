@@ -1,7 +1,7 @@
-import { AbortError, NetworkError, TimeoutError, type TransportError } from "./errors.js";
-import { compose, type Middleware } from "./middleware.js";
-import { appendMapQuery, appendQuery, buildURL, encodeHeaderValue, jsonBody } from "./request.js";
-import { err, ok, type Result } from "./result.js";
+import { AbortError, NetworkError, TimeoutError, type TransportError } from './errors.js';
+import { compose, type Middleware } from './middleware.js';
+import { appendMapQuery, appendQuery, buildURL, encodeHeaderValue, jsonBody } from './request.js';
+import { err, ok, type Result } from './result.js';
 
 /**
  * TokenProvider supplies a credential: a fixed string, or a function invoked
@@ -10,15 +10,13 @@ import { err, ok, type Result } from "./result.js";
  *
  * For basic auth the credential is `username:password`.
  */
-export type TokenProvider =
-  | string
-  | (() => string | undefined | Promise<string | undefined>);
+export type TokenProvider = string | (() => string | undefined | Promise<string | undefined>);
 
 /** SecurityScheme describes where one of the design's security schemes puts its credential. */
 export type SecurityScheme =
-  | { scheme: string; kind: "bearer"; in: "header" | "query"; name: string }
-  | { scheme: string; kind: "apiKey"; in: "header" | "query"; name: string }
-  | { scheme: string; kind: "basic" };
+  | { scheme: string; kind: 'bearer'; in: 'header' | 'query'; name: string }
+  | { scheme: string; kind: 'apiKey'; in: 'header' | 'query'; name: string }
+  | { scheme: string; kind: 'basic' };
 
 export interface ClientOptions {
   /** baseURL is prepended to every endpoint path; its own path prefix is kept. */
@@ -66,8 +64,7 @@ export function createClient(options: ClientOptions): Client {
 }
 
 /** RequestOptions tune a single call. Unlisted `RequestInit` fields pass through to fetch. */
-export interface RequestOptions
-  extends Omit<RequestInit, "method" | "body" | "headers" | "signal"> {
+export interface RequestOptions extends Omit<RequestInit, 'method' | 'body' | 'headers' | 'signal'> {
   signal?: AbortSignal | undefined;
   /** headers are merged over the client's headers and the endpoint's own. */
   headers?: HeadersInit | undefined;
@@ -87,10 +84,10 @@ export interface StreamOptions extends RequestOptions {
  * `send`, which passes it to fetch untouched.
  */
 export type EndpointBody =
-  | { kind: "fields"; fields: readonly string[] }
-  | { kind: "attr"; attr: string }
-  | { kind: "whole" }
-  | { kind: "raw" };
+  | { kind: 'fields'; fields: readonly string[] }
+  | { kind: 'attr'; attr: string }
+  | { kind: 'whole' }
+  | { kind: 'raw' };
 
 /** EndpointSpec is the transport mapping of one goa HTTP endpoint. */
 export interface EndpointSpec {
@@ -103,10 +100,10 @@ export interface EndpointSpec {
   queryParams: Readonly<Record<string, string>>;
   /** headerParams maps request properties to header names. */
   headerParams: Readonly<Record<string, string>>;
-  /** mapQuery names the request property whose entries spread into the query string ("" = the whole request). */
+  /** mapQuery names the request property whose entries spread into the query string ('' = the whole request). */
   mapQuery?: string | undefined;
   body?: EndpointBody | undefined;
-  /** accept is the Accept header; "" sends none (WebSocket endpoints). */
+  /** accept is the Accept header; '' sends none (WebSocket endpoints). */
   accept: string;
   security: readonly SecurityScheme[];
 }
@@ -136,7 +133,11 @@ export async function prepareRequest(
   client: Client,
   spec: EndpointSpec,
   wire: unknown,
-  options?: { headers?: HeadersInit | undefined; baseURL?: string | undefined; lastEventId?: string | undefined },
+  options?: {
+    headers?: HeadersInit | undefined;
+    baseURL?: string | undefined;
+    lastEventId?: string | undefined;
+  },
   rawBody?: BodyInit | null,
 ): Promise<Result<PreparedRequest, NetworkError>> {
   const config = client.options;
@@ -155,12 +156,12 @@ export async function prepareRequest(
     appendQuery(query, name, get(prop));
   }
   if (spec.mapQuery !== undefined) {
-    appendMapQuery(query, spec.mapQuery === "" ? wire : get(spec.mapQuery));
+    appendMapQuery(query, spec.mapQuery === '' ? wire : get(spec.mapQuery));
   }
 
   const headers = new Headers(config.headers);
   if (spec.accept) {
-    headers.set("Accept", spec.accept);
+    headers.set('Accept', spec.accept);
   }
   for (const [prop, name] of Object.entries(spec.headerParams)) {
     const value = get(prop);
@@ -169,16 +170,16 @@ export async function prepareRequest(
     }
   }
   if (options?.lastEventId) {
-    headers.set("Last-Event-ID", options.lastEventId);
+    headers.set('Last-Event-ID', options.lastEventId);
   }
 
   let body: BodyInit | undefined;
-  if (spec.body?.kind === "raw") {
+  if (spec.body?.kind === 'raw') {
     body = rawBody ?? undefined;
   } else if (spec.body) {
     let value: unknown;
     switch (spec.body.kind) {
-      case "fields": {
+      case 'fields': {
         const picked: Record<string, unknown> = {};
         for (const field of spec.body.fields) {
           const v = get(field);
@@ -189,16 +190,16 @@ export async function prepareRequest(
         value = picked;
         break;
       }
-      case "attr":
+      case 'attr':
         value = get(spec.body.attr);
         break;
-      case "whole":
+      case 'whole':
         value = wire;
         break;
     }
     if (value !== undefined) {
       body = jsonBody(value);
-      headers.set("Content-Type", "application/json");
+      headers.set('Content-Type', 'application/json');
     }
   }
 
@@ -213,7 +214,7 @@ export async function prepareRequest(
       applyCredential(scheme, token, headers, query);
     }
   } catch (cause) {
-    return err(new NetworkError("credential provider failed", { cause }));
+    return err(new NetworkError('credential provider failed', { cause }));
   }
 
   const url = buildURL(options?.baseURL ?? config.baseURL, spec.path, pathParams, query);
@@ -225,10 +226,10 @@ export async function prepareRequest(
  * schema encoding. It resolves once response headers arrive; reading the body
  * is left to the caller.
  *
- * `rawBody` is the body of an endpoint whose spec says `body: { kind: "raw" }`.
+ * `rawBody` is the body of an endpoint whose spec says `body: { kind: 'raw' }`.
  * No `Content-Type` is set for it unless a header parameter or the caller
  * does; fetch derives one from a `Blob`, `FormData` or string. A
- * `ReadableStream` is sent with `duplex: "half"`, which Safari and Firefox do
+ * `ReadableStream` is sent with `duplex: 'half'`, which Safari and Firefox do
  * not support.
  */
 export async function send(
@@ -277,9 +278,9 @@ export async function send(
   }
   if (body !== undefined) {
     requestInit.body = body;
-    if (typeof ReadableStream !== "undefined" && body instanceof ReadableStream) {
+    if (typeof ReadableStream !== 'undefined' && body instanceof ReadableStream) {
       // Required to send a stream; missing from older DOM typings.
-      (requestInit as RequestInit & { duplex?: "half" }).duplex = "half";
+      (requestInit as RequestInit & { duplex?: 'half' }).duplex = 'half';
     }
   }
   if (signal) {
@@ -297,7 +298,7 @@ export async function send(
     if (callerSignal?.aborted || isAbort(cause)) {
       return err(new AbortError(undefined, { cause }));
     }
-    return err(new NetworkError(cause instanceof Error ? cause.message : "network error", { cause }));
+    return err(new NetworkError(cause instanceof Error ? cause.message : 'network error', { cause }));
   } finally {
     // The timeout only bounds the wait for headers, so a stream outlives it.
     if (timer !== undefined) {
@@ -307,26 +308,23 @@ export async function send(
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /** isAbort reports whether a fetch or stream failure was caused by an abort signal. */
 export function isAbort(cause: unknown): boolean {
-  return typeof cause === "object" && cause !== null && (cause as { name?: unknown }).name === "AbortError";
+  return typeof cause === 'object' && cause !== null && (cause as { name?: unknown }).name === 'AbortError';
 }
 
-async function resolveToken(
-  auth: ClientOptions["auth"],
-  scheme: string,
-): Promise<string | undefined> {
+async function resolveToken(auth: ClientOptions['auth'], scheme: string): Promise<string | undefined> {
   if (auth === undefined) {
     return undefined;
   }
-  const provider = typeof auth === "string" || typeof auth === "function" ? auth : auth[scheme];
+  const provider = typeof auth === 'string' || typeof auth === 'function' ? auth : auth[scheme];
   if (provider === undefined) {
     return undefined;
   }
-  return typeof provider === "function" ? await provider() : provider;
+  return typeof provider === 'function' ? await provider() : provider;
 }
 
 function applyCredential(
@@ -336,14 +334,14 @@ function applyCredential(
   query: URLSearchParams,
 ): void {
   switch (scheme.kind) {
-    case "basic":
-      if (!headers.has("Authorization")) {
-        headers.set("Authorization", `Basic ${base64UTF8(token)}`);
+    case 'basic':
+      if (!headers.has('Authorization')) {
+        headers.set('Authorization', `Basic ${base64UTF8(token)}`);
       }
       return;
-    case "bearer":
-    case "apiKey": {
-      if (scheme.in === "query") {
+    case 'bearer':
+    case 'apiKey': {
+      if (scheme.in === 'query') {
         if (!query.has(scheme.name)) {
           query.set(scheme.name, token);
         }
@@ -355,7 +353,7 @@ function applyCredential(
       // goa strips the scheme prefix server side; a token that already names
       // one (it contains a space) is sent as is.
       const bearer =
-        scheme.kind === "bearer" && scheme.name.toLowerCase() === "authorization" && !token.includes(" ");
+        scheme.kind === 'bearer' && scheme.name.toLowerCase() === 'authorization' && !token.includes(' ');
       headers.set(scheme.name, bearer ? `Bearer ${token}` : token);
       return;
     }
@@ -363,7 +361,7 @@ function applyCredential(
 }
 
 function base64UTF8(text: string): string {
-  let binary = "";
+  let binary = '';
   for (const byte of new TextEncoder().encode(text)) {
     binary += String.fromCharCode(byte);
   }
@@ -375,7 +373,7 @@ function anySignal(a?: AbortSignal, b?: AbortSignal): AbortSignal | undefined {
   if (!a || !b) {
     return a ?? b;
   }
-  if (typeof AbortSignal.any === "function") {
+  if (typeof AbortSignal.any === 'function') {
     return AbortSignal.any([a, b]);
   }
   const controller = new AbortController();
@@ -384,7 +382,7 @@ function anySignal(a?: AbortSignal, b?: AbortSignal): AbortSignal | undefined {
       controller.abort(signal.reason);
       break;
     }
-    signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
+    signal.addEventListener('abort', () => controller.abort(signal.reason), { once: true });
   }
   return controller.signal;
 }

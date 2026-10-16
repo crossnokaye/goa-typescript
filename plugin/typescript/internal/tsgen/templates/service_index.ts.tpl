@@ -4,7 +4,7 @@
 {{- end }}
 {{- if .Endpoints }}
 {{ range .Endpoints }}
-export * from "./{{ .FileName }}.js";
+export * from './{{ .FileName }}.js';
 {{- end }}
 {{- else }}
 

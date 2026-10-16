@@ -1,0 +1,8 @@
+{
+  "singleQuote": true,
+  "printWidth": 110,
+  "overrides": [
+    { "files": "runtime/test/**/*.ts", "options": { "printWidth": 130 } },
+    { "files": "examples/toy/ts/*.ts", "options": { "printWidth": 120 } }
+  ]
+}

@@ -1,12 +1,12 @@
-import type * as z from "zod";
+import type * as z from 'zod';
 
-import { isAbort } from "./client.js";
-import { AbortError, NetworkError } from "./errors.js";
-import { bytesToBase64, decode, invalidJSON } from "./schema.js";
+import { isAbort } from './client.js';
+import { AbortError, NetworkError } from './errors.js';
+import { bytesToBase64, decode, invalidJSON } from './schema.js';
 
 /** SseFrame is one dispatched Server-Sent Event. */
 export interface SseFrame {
-  /** data is the event's `data:` lines joined with "\n". */
+  /** data is the event's `data:` lines joined with '\n'. */
   data: string;
   /** id is the last event ID in effect for this event, when the stream ever sent one. */
   id?: string;
@@ -38,7 +38,7 @@ export function createParser(
   // pendingCR is true when the last chunk ended in CR: a following LF belongs
   // to the same line ending.
   let pendingCR = false;
-  let line = "";
+  let line = '';
   let data: string[] = [];
   let event: string | undefined;
   let retry: number | undefined;
@@ -46,7 +46,7 @@ export function createParser(
 
   function dispatch(): void {
     if (data.length > 0) {
-      const frame: SseFrame = { data: data.join("\n") };
+      const frame: SseFrame = { data: data.join('\n') };
       if (lastEventId !== undefined) {
         frame.id = lastEventId;
       }
@@ -64,33 +64,33 @@ export function createParser(
   }
 
   function processLine(text: string): void {
-    if (text === "") {
+    if (text === '') {
       dispatch();
       return;
     }
-    if (text.startsWith(":")) {
+    if (text.startsWith(':')) {
       return;
     }
-    const colon = text.indexOf(":");
+    const colon = text.indexOf(':');
     const field = colon === -1 ? text : text.slice(0, colon);
-    let value = colon === -1 ? "" : text.slice(colon + 1);
-    if (value.startsWith(" ")) {
+    let value = colon === -1 ? '' : text.slice(colon + 1);
+    if (value.startsWith(' ')) {
       value = value.slice(1);
     }
     switch (field) {
-      case "data":
+      case 'data':
         data.push(value);
         break;
-      case "event":
+      case 'event':
         event = value;
         break;
-      case "id":
-        if (!value.includes("\u0000")) {
+      case 'id':
+        if (!value.includes('\u0000')) {
           lastEventId = value;
           onId?.(value);
         }
         break;
-      case "retry":
+      case 'retry':
         if (/^[0-9]+$/.test(value)) {
           retry = Number(value);
           onRetry?.(retry);
@@ -103,7 +103,7 @@ export function createParser(
 
   return {
     feed(chunk: string): void {
-      if (chunk === "") {
+      if (chunk === '') {
         return;
       }
       if (!started) {
@@ -115,7 +115,7 @@ export function createParser(
       let start = 0;
       if (pendingCR) {
         pendingCR = false;
-        if (chunk.startsWith("\n")) {
+        if (chunk.startsWith('\n')) {
           start = 1;
         }
       }
@@ -125,7 +125,7 @@ export function createParser(
           continue;
         }
         processLine(line + chunk.slice(start, i));
-        line = "";
+        line = '';
         if (code === 0x0d) {
           if (i + 1 === chunk.length) {
             pendingCR = true;
@@ -158,7 +158,7 @@ export class EventStream<T> implements AsyncIterable<T> {
   readonly response: Response;
   readonly #decode: FrameDecoder<T>;
   readonly #reader: ReadableStreamDefaultReader<Uint8Array>;
-  readonly #text = new TextDecoder("utf-8", { ignoreBOM: true });
+  readonly #text = new TextDecoder('utf-8', { ignoreBOM: true });
   readonly #frames: SseFrame[] = [];
   readonly #parser: SseParser;
   #lastEventId: string | undefined;
@@ -168,7 +168,7 @@ export class EventStream<T> implements AsyncIterable<T> {
 
   constructor(response: Response, decoder: FrameDecoder<T>) {
     if (!response.body) {
-      throw new TypeError("EventStream requires a response with a body");
+      throw new TypeError('EventStream requires a response with a body');
     }
     this.response = response;
     this.#decode = decoder;
@@ -242,9 +242,9 @@ export class EventStream<T> implements AsyncIterable<T> {
           return { done: true, value: undefined };
         }
         if (isAbort(cause)) {
-          throw new AbortError("stream aborted", { cause });
+          throw new AbortError('stream aborted', { cause });
         }
-        throw new NetworkError(cause instanceof Error ? cause.message : "stream failed", { cause });
+        throw new NetworkError(cause instanceof Error ? cause.message : 'stream failed', { cause });
       }
       if (chunk.done) {
         // An event left open at end of input is discarded, per the SSE spec.
@@ -257,7 +257,7 @@ export class EventStream<T> implements AsyncIterable<T> {
 }
 
 /** SseDataEncoding says how goa wrote the event data. */
-export type SseDataEncoding = "json" | "string" | "boolean" | "int" | "float" | "bytes";
+export type SseDataEncoding = 'json' | 'string' | 'boolean' | 'int' | 'float' | 'bytes';
 
 /** SseMapping records how a design maps event attributes onto SSE fields. */
 export interface SseMapping {
@@ -282,7 +282,7 @@ export function sseDecoder<T extends z.ZodType>(schema: T, mapping: SseMapping):
     if (mapping.data !== null) {
       wire = { [mapping.data]: data };
     }
-    if (typeof wire === "object" && wire !== null && !Array.isArray(wire)) {
+    if (typeof wire === 'object' && wire !== null && !Array.isArray(wire)) {
       const overlay: Record<string, unknown> = { ...(wire as Record<string, unknown>) };
       if (mapping.id !== null && frame.id !== undefined) {
         overlay[mapping.id] = frame.id;
@@ -306,20 +306,20 @@ export function sseDecoder<T extends z.ZodType>(schema: T, mapping: SseMapping):
 /** parseData reverses goa's formatting of event data. Unparseable text is left for the schema to reject. */
 function parseData(text: string, encoding: SseDataEncoding): unknown {
   switch (encoding) {
-    case "string":
+    case 'string':
       return text;
-    case "boolean":
-      return text === "true" ? true : text === "false" ? false : text;
-    case "int":
+    case 'boolean':
+      return text === 'true' ? true : text === 'false' ? false : text;
+    case 'int':
       return /^[+-]?[0-9]+$/.test(text) ? Number(text) : text;
-    case "float": {
-      const value = text.trim() === "" ? Number.NaN : Number(text);
+    case 'float': {
+      const value = text.trim() === '' ? Number.NaN : Number(text);
       return Number.isNaN(value) ? text : value;
     }
-    case "bytes":
+    case 'bytes':
       // goa writes the bytes raw; the Bytes schema expects base64.
       return bytesToBase64(new TextEncoder().encode(text));
-    case "json":
+    case 'json':
       try {
         return JSON.parse(text);
       } catch (cause) {

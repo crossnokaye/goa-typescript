@@ -8,9 +8,9 @@
  * `CallResult` to pick up both arms and produce `T | undefined`. Nothing here
  * runs: expectTypeOf is a no-op at runtime and tsc enforces the assertions.
  */
-import { expectTypeOf } from "vitest";
+import { expectTypeOf } from 'vitest';
 
-import { type CallResult, type Result, unwrap, unwrapAsync } from "../../src/index.js";
+import { type CallResult, type Result, unwrap, unwrapAsync } from '../../src/index.js';
 
 interface ThingReply {
   readonly thing: { readonly name: string };

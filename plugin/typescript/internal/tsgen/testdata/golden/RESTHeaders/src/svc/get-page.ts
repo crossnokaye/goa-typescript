@@ -11,39 +11,39 @@ import {
   type OtherErrorName,
   type RequestOptions,
   send,
-} from "../runtime/index.js";
-import { Page } from "../types.js";
+} from '../runtime/index.js';
+import { Page } from '../types.js';
 
 const getPageSpec: EndpointSpec = {
-  method: "GET",
-  path: "/page",
+  method: 'GET',
+  path: '/page',
   pathParams: {},
   queryParams: {},
   headerParams: {},
-  accept: "application/json",
+  accept: 'application/json',
   security: [],
 };
 
 const getPageResponses = {
   200: {
-    body: "fields",
+    body: 'fields',
     headers: {
-      etag: { name: "ETag", shape: "string" },
-      total: { name: "X-Total", shape: "number" },
-      ratio: { name: "X-Ratio", shape: "number" },
-      more: { name: "X-More", shape: "boolean" },
-      expires: { name: "Expires-At", shape: "string" },
-      version: { name: "X-Version", shape: "number" },
-      tags: { name: "X-Tags", shape: "string[]" },
-      counts: { name: "X-Counts", shape: "number[]" },
-      flags: { name: "X-Flags", shape: "boolean[]" },
-      legacyName: { name: "X-Legacy-Name", shape: "string" },
+      etag: { name: 'ETag', shape: 'string' },
+      total: { name: 'X-Total', shape: 'number' },
+      ratio: { name: 'X-Ratio', shape: 'number' },
+      more: { name: 'X-More', shape: 'boolean' },
+      expires: { name: 'Expires-At', shape: 'string' },
+      version: { name: 'X-Version', shape: 'number' },
+      tags: { name: 'X-Tags', shape: 'string[]' },
+      counts: { name: 'X-Counts', shape: 'number[]' },
+      flags: { name: 'X-Flags', shape: 'boolean[]' },
+      legacyName: { name: 'X-Legacy-Name', shape: 'string' },
     },
   },
 } as const;
 
 /** getPageErrors lists the errors the design declares for getPage, by HTTP status. */
-export const getPageErrors = {} as const;
+const getPageErrors = {} as const;
 
 /** GetPageError is everything getPage can fail with. */
 export type GetPageError =

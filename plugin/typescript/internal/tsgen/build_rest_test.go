@@ -173,7 +173,7 @@ func TestBuildRESTHeaders(t *testing.T) {
 		Headers: []HeaderSpec{{Attr: "X-Count", Key: "", Name: "X-Count", Shape: "number"}},
 	})
 	wantEqual(t, "count table", count.ResponsesTS, `{
-  200: { body: "none", scalar: true, headers: { "": { name: "X-Count", shape: "number" } } },
+  200: { body: 'none', scalar: true, headers: { '': { name: 'X-Count', shape: 'number' } } },
 } as const`)
 
 	wantEqual(t, "skipped", svc.Skipped, []SkippedEndpoint{{
@@ -195,9 +195,9 @@ func TestBuildRESTStatuses(t *testing.T) {
 		{Status: 202, Body: BodyNone, Tag: [2]string{"outcome", "accepted"}, Missing: []string{"id"}},
 	})
 	wantEqual(t, "upsert table", upsert.ResponsesTS, `{
-  200: { body: "fields" },
-  201: { body: "fields", tag: ["outcome", "created"] },
-  202: { body: "none", tag: ["outcome", "accepted"] },
+  200: { body: 'fields' },
+  201: { body: 'fields', tag: ['outcome', 'created'] },
+  202: { body: 'none', tag: ['outcome', 'accepted'] },
 } as const`)
 
 	// gaia's shape: one result type decodes both responses.
@@ -216,7 +216,7 @@ func TestBuildRESTStatuses(t *testing.T) {
 			`the generated client rejects that response with a validation error`,
 	})
 	if doc := restDoc(strict); !strings.Contains(doc, "A 204 response does not carry `id`") ||
-		!strings.Contains(doc, "Succeeds with 200 or 204 (`state` is \"gone\")") {
+		!strings.Contains(doc, "Succeeds with 200 or 204 (`state` is 'gone')") {
 		t.Errorf("the function's documentation should name the gap:\n%s", doc)
 	}
 }
@@ -241,14 +241,14 @@ func TestBuildRESTErrors(t *testing.T) {
 	wantEqual(t, "busy", *busy, ErrorSpec{Name: "busy", Status: 503, Default: true})
 
 	wantEqual(t, "table", ep.ErrorTable, `{
-  409: [{ name: "conflict", schema: CreateThingConflictDetail }],
-  418: [{ name: "teapot", schema: CreateThingTeapotDetail }],
-  422: [{ name: "invalid", schema: ValidationProblem, headers: { retry_after: { name: "Retry-After", shape: "number" } } }],
-  503: [{ name: "busy" }],
+  409: [{ name: 'conflict', schema: CreateThingConflictDetail }],
+  418: [{ name: 'teapot', schema: CreateThingTeapotDetail }],
+  422: [{ name: 'invalid', schema: ValidationProblem, headers: { retry_after: { name: 'Retry-After', shape: 'number' } } }],
+  503: [{ name: 'busy' }],
 } as const`)
 	for _, member := range []string{
-		`GoaError<"conflict", CreateThingConflictDetail>`, `GoaError<"teapot", CreateThingTeapotDetail>`,
-		`GoaError<"invalid", ValidationProblem>`, `GoaError<"busy">`,
+		`GoaError<'conflict', CreateThingConflictDetail>`, `GoaError<'teapot', CreateThingTeapotDetail>`,
+		`GoaError<'invalid', ValidationProblem>`, `GoaError<'busy'>`,
 	} {
 		if !strings.Contains(ep.ErrorTS, "\n  | "+member) {
 			t.Errorf("error union lacks %s:%s", member, ep.ErrorTS)
@@ -279,7 +279,7 @@ func TestBuildRESTRaw(t *testing.T) {
 	upload := endpoint(t, svc, "upload")
 	wantEqual(t, "upload raw", upload.RawBody, true)
 	wantEqual(t, "upload body", upload.Request.Body, BodySpec{Kind: BodyRaw})
-	if !strings.Contains(upload.SpecTS, `body: { kind: "raw" },`) {
+	if !strings.Contains(upload.SpecTS, `body: { kind: 'raw' },`) {
 		t.Errorf("transport mapping should declare a raw body:\n%s", upload.SpecTS)
 	}
 	wantEqual(t, "upload result", upload.ResultTS, "UploadResult")
@@ -289,7 +289,7 @@ func TestBuildRESTRaw(t *testing.T) {
 	if anonymous.Request != nil {
 		t.Errorf("no payload, yet the request is %+v", anonymous.Request)
 	}
-	if !strings.Contains(anonymous.SpecTS, `body: { kind: "raw" },`) {
+	if !strings.Contains(anonymous.SpecTS, `body: { kind: 'raw' },`) {
 		t.Errorf("transport mapping should declare a raw body:\n%s", anonymous.SpecTS)
 	}
 
@@ -387,7 +387,7 @@ func TestBuildRESTMixed(t *testing.T) {
 	wantEqual(t, "stream accept", ep.Stream.Accept, "text/event-stream")
 	wantEqual(t, "event", ep.SSE.EventTypeName, "Thing")
 	// Each function sends its own Accept header; everything else is shared.
-	if !strings.Contains(ep.SpecTS, `accept: "application/json",`) || !strings.Contains(ep.Stream.SpecTS, `accept: "text/event-stream",`) {
+	if !strings.Contains(ep.SpecTS, `accept: 'application/json',`) || !strings.Contains(ep.Stream.SpecTS, `accept: 'text/event-stream',`) {
 		t.Errorf("transport mappings:\n%s\n%s", ep.SpecTS, ep.Stream.SpecTS)
 	}
 	wantEqual(t, "same mapping otherwise",

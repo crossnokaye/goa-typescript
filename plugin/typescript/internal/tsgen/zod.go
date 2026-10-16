@@ -1,9 +1,11 @@
 package tsgen
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -361,13 +363,61 @@ func plainJSON(att *expr.AttributeExpr) bool {
 	return p.Kind() != expr.BytesKind && formatOf(att) != expr.FormatDateTime
 }
 
-// jsonLiteral renders a design value as a JSON literal.
+// jsonLiteral renders a design value as a compact JavaScript literal with
+// single-quoted strings. The value is normalized through encoding/json first,
+// so object keys come out sorted and numbers keep their JSON spelling.
 func jsonLiteral(v any) (string, bool) {
-	b, err := json.Marshal(jsonable(v))
+	raw, err := json.Marshal(jsonable(v))
 	if err != nil {
 		return "", false
 	}
-	return string(b), true
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	var norm any
+	if err := dec.Decode(&norm); err != nil {
+		return "", false
+	}
+	var b strings.Builder
+	writeJSLiteral(&b, norm)
+	return b.String(), true
+}
+
+func writeJSLiteral(b *strings.Builder, v any) {
+	switch x := v.(type) {
+	case nil:
+		b.WriteString("null")
+	case bool:
+		b.WriteString(strconv.FormatBool(x))
+	case json.Number:
+		b.WriteString(x.String())
+	case string:
+		b.WriteString(tsString(x))
+	case []any:
+		b.WriteByte('[')
+		for i, e := range x {
+			if i > 0 {
+				b.WriteByte(',')
+			}
+			writeJSLiteral(b, e)
+		}
+		b.WriteByte(']')
+	case map[string]any:
+		keys := make([]string, 0, len(x))
+		for k := range x {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		b.WriteByte('{')
+		for i, k := range keys {
+			if i > 0 {
+				b.WriteByte(',')
+			}
+			b.WriteString(tsString(k))
+			b.WriteByte(':')
+			writeJSLiteral(b, x[k])
+		}
+		b.WriteByte('}')
+	}
 }
 
 // jsonable converts the map[any]any values the DSL can produce into maps that

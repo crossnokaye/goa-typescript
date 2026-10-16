@@ -9,16 +9,16 @@ import {
   type TransportError,
   type WebSocketOptions,
   type WebSocketStream,
-} from "../runtime/index.js";
-import { Note, NoteRequest } from "../types.js";
+} from '../runtime/index.js';
+import { Note, NoteRequest } from '../types.js';
 
 const notesSpec: EndpointSpec = {
-  method: "GET",
-  path: "/notes",
+  method: 'GET',
+  path: '/notes',
   pathParams: {},
   queryParams: {},
   headerParams: {},
-  accept: "",
+  accept: '',
   security: [],
 };
 

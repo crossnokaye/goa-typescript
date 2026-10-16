@@ -194,7 +194,7 @@ A `Blob` (so a `File`), an `ArrayBuffer`, `FormData` and a string work everywher
 Things worth knowing:
 
 - **Cross-origin headers.** A browser shows script only a short list of response headers from another origin. Unless the UI and the service share an origin, the service must list every header a design maps to an attribute, plus `goa-error` and `goa-view`, in `Access-Control-Expose-Headers`. Without `goa-error` the name of an error is still read from the body of goa's default error type; a custom error type that shares its status code with another error cannot be told apart.
-- **`void` and TanStack Query.** `unwrapAsync(toy.deleteThing(...))` resolves to `undefined`. That is right for `useMutation`. A `useQuery` `queryFn` must not resolve to `undefined`: return something else from it (a generated `xyzQuery` for a `GET` without a result has this problem too).
+- **`void` and TanStack Query.** `unwrapAsync(toy.deleteThing(...))` resolves to `undefined`. That is right for `useMutation`. A `useQuery` `queryFn` must not resolve to `undefined`: return something else from it. The generated [query options](#tanstack-query-opt-in) of a read without a result resolve to `null` for that reason.
 - **A 200 that is not JSON** (a proxy's login page, say) is an `UnexpectedResponseError` carrying the text, not a validation error.
 - **`null` for an empty array or map.** A Go service encodes a nil slice or map result as `null`; the client reads it as empty.
 - **Array headers** are split on commas, so an element that contains one does not survive. goa has the same limit on the way in.
@@ -317,6 +317,8 @@ var _ = API("toy", func() {
 })
 ```
 
+The endpoint file of a classified method exports its transport mapping (`getThingSpec`) for the query file beside it. It is tagged `@internal`: it is not part of the package's contract and may change between releases.
+
 Nothing in the generated package imports TanStack: the runtime (`runtime/query.ts`) declares the shapes TanStack accepts structurally, and the toy's tests prove them against `@tanstack/query-core`. Each method's exports live in `src/<service>/<method>.query.ts`, re-exported by the service barrel, one line each calling a runtime helper, and each carries a JSDoc state card: who owns the data (the server), the key it lives under, that it is not writable, and which generated mutations invalidate it.
 
 | Method | Exports | Returns |
@@ -327,6 +329,7 @@ Nothing in the generated package imports TanStack: the runtime (`runtime/query.t
 | a mixed method | `streamOrListQuery`/`streamOrListKey` and `streamOrListStreamQuery`/`streamOrListStreamKey` | a query and a stream |
 
 - `Meta("typescript:query:kind", "query" | "mutation" | "none")` on a `Method` overrides the classification: a `POST` that only reads becomes a query, a method can opt out. `goa gen` fails on an override that cannot work (a query over a bidirectional WebSocket, a raw upload or a raw download).
+- A `GET` or `HEAD` without a `Result` resolves to `null`, not `undefined`, which TanStack Query treats as an error: its data is typed `null`.
 - No options are generated for raw downloads (`SkipResponseBodyEncodeDecode`: the body is left on the response), WebSocket methods that stream a payload, and the methods the SDK skips. The service barrel lists them with the reason.
 
 ```ts
@@ -338,15 +341,18 @@ const queryClient = useQueryClient();
 const upsert = useMutation(toy.upsertThingMutation(client, { queryClient }));
 ```
 
-**Keys.** A key is the path of the route, split on `/`, with each parameter replaced by its value, then one object holding every other input: query parameters and header parameters under their request property names, map query entries, the JSON body's properties. Values are in wire form (a `Date` is its RFC 3339 string), so keys are stable and serializable. The object is left out when there is nothing in it; an attribute set to `undefined` is left out of it.
+**Keys.** A key is the path of the route, split on `/`, with each parameter replaced by its value, then one object holding every other input: query parameters and header parameters under their request property names, map query entries, the JSON body's properties. Values are in wire form (a `Date` is its RFC 3339 string), so keys are stable and serializable. The object is left out when there is nothing in it; an attribute set to `undefined` is left out of it. A stream's key always has the object, with `$stream: true` first.
 
 ```ts
 toy.getThingKey({ id: 'abc', tags: ['x'], verbose: true }); // ['things', 'abc', { tags: ['x'], verbose: true }]
 toy.getThingKey({ id: 'abc' });                             // ['things', 'abc']
 toy.listThingsKey();                                        // ['things']
-toy.streamThingsSseKey({ id: 'abc' });                      // ['things', 'abc', 'events']
-toy.getThingKey();                                          // ['things']: the prefix, which matches every getThing key
+toy.streamThingsSseKey({ id: 'abc' });                      // ['things', 'abc', 'events', { $stream: true }]
+toy.getThingKey();                                          // ['things']: an invalidation prefix, not a cache key
+toy.streamOrListStreamKey();                                // ['stream-or-list', { $stream: true }]
 ```
+
+**`xyzKey()` without a payload is an invalidation prefix**, which matches every key of the method. For a route with parameters it is the static segments before the first one (`['things']`), which other methods under the same path share: use it with `invalidateQueries` or `cancelQueries`, never with `setQueryData`. For a route without parameters it is the route followed by the key's markers when it has some (`$stream`, `$method`), so that it is no other query's exact key: `streamOrListStreamKey()` is not `streamOrListKey()`. A route that starts with a parameter gets the route with `null` for each one, never the empty key.
 
 Credentials never enter a key (they are not in the request types), nor does anything of the client such as its base URL: a key names the data, not who asked for it or where. The service name does not either, so two services that serve the same path share keys, as they share URLs. A payload that fails validation gets a key no real request has, the route with `null` for each parameter and a trailing `{ $invalid: true }` (`['things', null, { $invalid: true }]`), and its `queryFn` rejects with the `RequestValidationError`; it never takes over the cache entry of another query, such as the list under the same prefix.
 
@@ -373,14 +379,17 @@ const { data: count } = useQuery(
 - The generated code does not import `streamedQuery` because it does not import TanStack at all: the package keeps `zod` as its only dependency, and the helper is still `experimental_` in TanStack, so the application picks the version it runs. It needs TanStack Query 5.86 or later, where `streamedQuery` takes `streamFn`, `reducer` and `initialValue` (earlier releases named the function `queryFn`).
 - The payload is a required parameter (`undefined` for a method without one, or to disable a stream whose payload the design requires), because the options follow it.
 - `staleTime` is `Infinity`: an open stream is never stale, and a refetch would reopen it.
+- **Mutations never invalidate a stream.** `invalidateQueries` refetches every active query it matches whatever its `staleTime`, which for a stream means aborting it and opening it again from the start. The generated `onSuccess` passes a `predicate` that skips every key carrying `$stream`; a stream shows new data through its own events. Invalidate one by hand with its key if that is what you want.
 - **A refetch is not a resume.** It opens a new stream from the start; `refetchMode` (`'reset'` by default, `'append'`, `'replace'`) only says what happens to the data already there. For an SSE stream that can resume, use the function itself with `lastEventId` ([SSE](#streaming-methods-sse)).
 - **The data grows without bound.** By default every event is appended to an array for as long as the stream is open. For a long-lived stream, pass a `reducer` (with its `initialValue`) that keeps what the screen needs: the latest value, a count, a bounded window. The reducer's second argument is typed as the method's event.
 - **Errors.** An error before the first event (a goa error, a refused connection) fails the query like any other. An error mid-stream (a message that fails validation, a dropped connection) fails it too, with the events received so far still in the cache. Unmounting, or `queryClient.cancelQueries`, aborts the signal and closes the connection.
 
 **Mutations.** `createThingMutation(client)` returns `{ mutationFn }`, which calls the function and throws its error; a raw upload's variables are `{ payload, body }`. Given `{ queryClient }`, it also returns an `onSuccess` that invalidates the keys the mutation affects and waits for them:
 
-- by default, the key of the mutation's own path with trailing parameters stripped: `PUT /things/{id}` and `POST /things` invalidate `['things']`, `DELETE /things/{id}/labels/{lid}` invalidates `['things', id, 'labels']` with `id` taken from the variables, and a path that ends in a static segment invalidates that whole key;
-- `Meta("typescript:invalidates", "list_things, get_thing")` on the method replaces the default with the key prefixes of the methods it names (queries or streams of the same service; `goa gen` fails on any other name). An empty string invalidates nothing.
+- by default, the nearest key under which a read lives: start from the mutation's own route with trailing parameters stripped, then drop the last segment until some `GET`/`HEAD` (or read-overridden) method's route starts with it, never below one segment. `PUT /things/{id}` and `POST /things` invalidate `['things']`; `DELETE /things/{id}/labels/{lid}` and `PUT /things/{id}/content` invalidate `['things', id]`, with `id` taken from the variables, when no read lives under `labels` or `content`. When no read lives under any of them, the mutation keeps the one-segment key, `goa gen` warns (`mutation "x" invalidates no query`) and the state card says so;
+- `Meta("typescript:invalidates", "list_things, get_thing")` on the method replaces the default with the key prefixes of the methods it names (queries or streams of the same service; `goa gen` fails on any other name, and on a method whose route starts with a parameter, which has no prefix). An empty string invalidates nothing.
+
+Stream keys are never invalidated, whatever the list says (see [Streams](#tanstack-query-opt-in)). A key that would be empty is dropped rather than sent, since it would match every query.
 
 `createThingInvalidates(variables)` returns the same keys for wiring invalidation by hand. To write the result into the cache as well, spread the options and call the generated `onSuccess` from yours:
 
@@ -395,7 +404,7 @@ useMutation({
 });
 ```
 
-**Collisions.** Two queries or streams whose routes are the same once parameter names are ignored (`/things/{id}` and `/things/{thing_id}`), across every service, would share keys. The `GET` keeps its clean key; every other member gets `$method` first in its trailing object (`['things', 'abc', { $method: 'HEAD' }]`); when no member is a `GET`, all of them do. The stream of a mixed method, which shares the `GET` route of its plain function, gets `$stream: true` instead (`['stream-or-list', { $stream: true }]`). The state cards say so. A disabled or invalid query keeps the discriminator first, before its sentinel.
+**Collisions.** Two reads, or two streams, whose routes are the same once parameter names are ignored (`/things/{id}` and `/things/{thing_id}`), across every service, would share keys. The `GET` keeps its clean key; every other member gets `$method` in its trailing object (`['things', 'abc', { $method: 'HEAD' }]`, after `$stream` for a stream); when no member is a `GET`, all of them do. A read and a stream never collide, since every stream key carries `$stream`: the plain function and the stream of a mixed method keep apart without a discriminator. The state cards say so. A disabled or invalid query keeps its markers first, before its sentinel.
 
 **Hooks.** None are generated, so the package does not depend on React or pin a TanStack adapter: the options work with `@tanstack/react-query`, `vue-query`, `solid-query` and plain `query-core` alike. A hook is a one-liner in the application, which also knows where its client comes from:
 

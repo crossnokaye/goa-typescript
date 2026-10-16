@@ -1573,3 +1573,227 @@ var WSSecurityDSL = func() {
 		})
 	})
 }
+
+// QueryDSL enables the TanStack Query layer and covers every classification:
+// reads with path, query and header parameters, a HEAD and a POST read that
+// collide with a GET (the POST in another service), mutations with default
+// and declared invalidation, a raw upload, a raw download, Server-Sent
+// Events, WebSocket streams and a mixed method.
+var QueryDSL = func() {
+	var Thing = Type("Thing", func() {
+		Attribute("id", String)
+		Attribute("name", String)
+		Attribute("updated_at", String, func() { Format(FormatDateTime) })
+		Required("id", "name")
+	})
+	API("api", func() {
+		Meta("typescript:query", "tanstack")
+	})
+	Service("things", func() {
+		Method("get_thing", func() {
+			Description("Returns a thing.")
+			Error("not_found")
+			Payload(func() {
+				Attribute("id", String)
+				Attribute("tags", ArrayOf(String))
+				Attribute("verbose", Boolean)
+				Attribute("since", String, func() { Format(FormatDateTime) })
+				Attribute("trace", String)
+				Required("id")
+			})
+			Result(Thing)
+			HTTP(func() {
+				GET("/things/{id}")
+				Param("tags:tag")
+				Param("verbose")
+				Param("since")
+				Header("trace:X-Trace-Id")
+				Response("not_found", StatusNotFound)
+			})
+		})
+		Method("head_thing", func() {
+			Description("Says whether a thing exists, and its version.")
+			Payload(func() {
+				Attribute("thing_id", String)
+				Required("thing_id")
+			})
+			Result(func() {
+				Attribute("etag", String)
+			})
+			HTTP(func() {
+				HEAD("/things/{thing_id}")
+				Response(StatusOK, func() {
+					Header("etag:ETag")
+				})
+			})
+		})
+		Method("list_things", func() {
+			Payload(func() {
+				Attribute("kind", String)
+				Attribute("limit", Int, func() { Default(10) })
+			})
+			Result(ArrayOf(Thing))
+			HTTP(func() {
+				GET("/things")
+				Param("kind")
+				Param("limit")
+			})
+		})
+		Method("search_things", func() {
+			Description("A read that takes a JSON body.")
+			Meta("typescript:query:kind", "query")
+			Payload(func() {
+				Attribute("text", String)
+				Attribute("kinds", ArrayOf(String))
+				Required("text")
+			})
+			Result(ArrayOf(Thing))
+			HTTP(func() {
+				POST("/things/search")
+			})
+		})
+		Method("count_things", func() {
+			Description("No payload.")
+			Result(Int)
+			HTTP(func() {
+				GET("/count")
+			})
+		})
+		Method("update_thing", func() {
+			Payload(func() {
+				Attribute("id", String)
+				Attribute("name", String)
+				Required("id", "name")
+			})
+			Result(Thing)
+			HTTP(func() {
+				PUT("/things/{id}")
+			})
+		})
+		Method("delete_label", func() {
+			Payload(func() {
+				Attribute("id", String)
+				Attribute("label_id", String)
+				Required("id", "label_id")
+			})
+			HTTP(func() {
+				DELETE("/things/{id}/labels/{label_id}")
+				Response(StatusNoContent)
+			})
+		})
+		Method("archive_thing", func() {
+			Description("Invalidates the methods it names.")
+			Meta("typescript:invalidates", "list_things, get_thing, watch_thing")
+			Payload(func() {
+				Attribute("id", String)
+				Required("id")
+			})
+			HTTP(func() {
+				POST("/things/{id}/archive")
+				Response(StatusNoContent)
+			})
+		})
+		Method("touch", func() {
+			Description("Invalidates nothing.")
+			Meta("typescript:invalidates", "")
+			HTTP(func() {
+				POST("/touch")
+				Response(StatusNoContent)
+			})
+		})
+		Method("upload_content", func() {
+			Payload(func() {
+				Attribute("id", String)
+				Attribute("content_type", String)
+				Required("id")
+			})
+			HTTP(func() {
+				PUT("/things/{id}/content")
+				Header("content_type:Content-Type")
+				SkipRequestBodyEncodeDecode()
+				Response(StatusNoContent)
+			})
+		})
+		Method("download_content", func() {
+			Payload(func() {
+				Attribute("id", String)
+				Required("id")
+			})
+			Result(func() {
+				Attribute("content_type", String)
+			})
+			HTTP(func() {
+				GET("/things/{id}/content")
+				SkipResponseBodyEncodeDecode()
+				Response(StatusOK, func() {
+					Header("content_type:Content-Type")
+				})
+			})
+		})
+		Method("watch_thing", func() {
+			Payload(func() {
+				Attribute("id", String)
+				Attribute("delay_ms", Int)
+				Required("id")
+			})
+			StreamingResult(Thing)
+			HTTP(func() {
+				GET("/things/{id}/events")
+				Param("delay_ms")
+				ServerSentEvents()
+			})
+		})
+		Method("ticks", func() {
+			Description("A server stream over a WebSocket.")
+			Payload(func() {
+				Attribute("id", String)
+				Required("id")
+			})
+			StreamingResult(Int)
+			HTTP(func() {
+				GET("/things/{id}/ticks")
+			})
+		})
+		Method("chat", func() {
+			StreamingPayload(String)
+			StreamingResult(String)
+			HTTP(func() {
+				GET("/chat")
+			})
+		})
+		Method("feed", func() {
+			Description("At once or as a stream.")
+			Payload(func() {
+				Attribute("kind", String)
+			})
+			Result(ArrayOf(Thing))
+			StreamingResult(Thing)
+			HTTP(func() {
+				GET("/feed")
+				Param("kind")
+				ServerSentEvents()
+			})
+		})
+		Method("ping", func() {
+			Meta("typescript:query:kind", "none")
+			HTTP(func() {
+				GET("/ping")
+			})
+		})
+	})
+	Service("legacy", func() {
+		Method("fetch_thing", func() {
+			Description("A POST read whose route collides with get_thing's.")
+			Meta("typescript:query:kind", "query")
+			Payload(func() {
+				Attribute("key", String)
+				Attribute("fields", ArrayOf(String))
+				Required("key")
+			})
+			Result(Thing)
+			HTTP(func() {
+				POST("/things/{key}")
+			})
+		})
+	})
+}

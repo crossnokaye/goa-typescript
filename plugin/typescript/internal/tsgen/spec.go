@@ -25,6 +25,9 @@ type PackageSpec struct {
 	// Warnings are remarks about the design that `goa gen` prints: the client
 	// is generated, but part of it cannot work as designed.
 	Warnings []string
+	// Query is true when Meta("typescript:query", "tanstack") enables the
+	// TanStack Query layer.
+	Query bool
 }
 
 // RuntimeFile is one TypeScript runtime source file.
@@ -108,6 +111,9 @@ type ServiceSpec struct {
 	HasSSE  bool
 	HasREST bool
 	HasWS   bool
+	// QueryNone lists the generated methods that get no query options, with
+	// the reason; empty unless the TanStack Query layer is enabled.
+	QueryNone []SkippedEndpoint
 }
 
 // SkippedEndpoint records why an endpoint has no generated function.
@@ -184,6 +190,71 @@ type EndpointSpec struct {
 	WS       *WebSocketSpec
 	// Imports is what the endpoint file imports.
 	Imports Imports
+	// Queries are the TanStack Query exports of the method, rendered into
+	// <FileName>.query.ts: the plain function's, then the stream's. Empty
+	// unless the layer is enabled and the method is classified.
+	Queries []*QuerySpec
+	// QueryImports is what the query file imports from the runtime.
+	QueryImports []string
+	// ExportSpec is true when the transport mapping constants are exported,
+	// for the query file to use.
+	ExportSpec bool
+}
+
+// QueryKind is how the TanStack Query layer classifies a generated function.
+type QueryKind string
+
+const (
+	// QueryRead is a read: query options and a key.
+	QueryRead QueryKind = "query"
+	// QueryStream is a stream: streamed query options and a key.
+	QueryStream QueryKind = "stream"
+	// QueryMutation is a write: mutation options and the keys it invalidates.
+	QueryMutation QueryKind = "mutation"
+	// QueryNone gets nothing.
+	QueryNone QueryKind = "none"
+)
+
+// QuerySpec describes the TanStack Query exports of one generated function.
+type QuerySpec struct {
+	Kind QueryKind
+	// FuncName and SpecName are the SDK function and its transport mapping.
+	FuncName string
+	SpecName string
+	// Verb and Path are the function's HTTP method and goa route.
+	Verb string
+	Path string
+	// RequestName is the request schema, "" when the method takes no payload.
+	RequestName string
+	// Required is true when the design requires a payload.
+	Required bool
+	// Raw is true for a raw upload: the variables are { payload, body }.
+	Raw bool
+	// Name is xyzQuery or xyzMutation.
+	Name string
+	// KeyName is xyzKey (queries and streams).
+	KeyName string
+	// InvalidatesName is xyzInvalidates (mutations).
+	InvalidatesName string
+	// Discriminator is true when the key carries $method because another
+	// query shares its path.
+	Discriminator bool
+	// Collisions describe the queries that share the path, as `VERB /path` (`name`).
+	Collisions []string
+	// Invalidates are the path templates of the keys a mutation invalidates.
+	Invalidates []string
+	// InvalidatedBy are the mutations whose invalidation matches this key.
+	InvalidatedBy []string
+	// Source is the shape of the key, for the state card.
+	Source string
+	// Decls are the rendered exports: JSDoc and one line of code each.
+	Decls []QueryDecl
+}
+
+// QueryDecl is one export of a query file.
+type QueryDecl struct {
+	Doc  string
+	Code string
 }
 
 // StreamFuncSpec names the Server-Sent Events function of a mixed method. It
@@ -250,11 +321,19 @@ type RequestSpec struct {
 	Query    []ParamSpec
 	Headers  []ParamSpec
 	Cookies  []ParamSpec
+	// Props are the request properties, with whether each may be absent.
+	Props []RequestProp
 	// MapQuery is the property whose entries spread into the query string;
 	// its Prop is "" when the payload itself is the map.
 	MapQuery  *ParamSpec
 	Body      BodySpec
 	Multipart bool
+}
+
+// RequestProp is one property of the request type.
+type RequestProp struct {
+	Key      string
+	Optional bool
 }
 
 // ParamSpec maps a request property to an HTTP element.

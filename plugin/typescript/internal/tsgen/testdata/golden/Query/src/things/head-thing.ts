@@ -32,7 +32,12 @@ export const HeadThingResult = z.object({
   etag: z.string().optional(),
 }) satisfies z.ZodType<HeadThingResult>;
 
-/** headThingSpec is the transport mapping of headThing. */
+/**
+ * headThingSpec is the transport mapping of headThing, for the sibling query file; it is not a
+ * public contract.
+ *
+ * @internal
+ */
 export const headThingSpec: EndpointSpec = {
   method: 'HEAD',
   path: '/things/{thing_id}',

@@ -10,19 +10,20 @@ import { fetchThing, FetchThingPayload, fetchThingSpec } from './fetch-thing.js'
  * - Owner: server
  * - Source: `["things", key, { $method: "POST", fields? }]`
  * - Writable: no
- * - Mutations & invalidation: `things.updateThingMutation`, `things.archiveThingMutation`
+ * - Mutations & invalidation: `things.updateThingMutation`, `things.deleteLabelMutation`, `things.archiveThingMutation`, `things.uploadContentMutation`
  * - Collides with `GET /things/{id}` (`things.getThingQuery`), `HEAD /things/{thing_id}` (`things.headThingQuery`): the key carries `$method: "POST"`
  */
 export const fetchThingQuery = queryFor(fetchThing, fetchThingSpec, FetchThingPayload, { required: true, discriminator: 'method' });
 
 /**
- * fetchThingKey returns the key of a fetchThing request, or without a payload the prefix
- * `["things"]` that every one of them starts with.
+ * fetchThingKey returns the key of a fetchThing request. Without a payload it returns
+ * `["things"]`, an invalidation prefix that other methods under the same path share:
+ * it is not a cache key.
  *
  * - Owner: server
  * - Source: `["things", key, { $method: "POST", fields? }]`
  * - Writable: no
- * - Mutations & invalidation: `things.updateThingMutation`, `things.archiveThingMutation`
+ * - Mutations & invalidation: `things.updateThingMutation`, `things.deleteLabelMutation`, `things.archiveThingMutation`, `things.uploadContentMutation`
  * - Collides with `GET /things/{id}` (`things.getThingQuery`), `HEAD /things/{thing_id}` (`things.headThingQuery`): the key carries `$method: "POST"`
  */
 export const fetchThingKey = keyFor(fetchThingSpec, FetchThingPayload, { discriminator: 'method' });

@@ -22,12 +22,18 @@ export type QueryKey = readonly unknown[];
 /** KeyFlags tune the key of one generated query. */
 export interface KeyFlags {
   /**
-   * discriminator tells apart queries whose routes collide, so that each
-   * keeps its own cache entry: 'method' puts `$method: '<VERB>'` first in the
-   * key's trailing object, 'stream' puts `$stream: true` (the stream of a
-   * mixed method, which shares its plain function's verb and route).
+   * stream marks the key of a stream: `$stream: true` comes first in its
+   * trailing object, always. Mutations never invalidate such a key, and a
+   * stream never shares a key with a read on the same route. `streamFor`
+   * sets it on its own; a stream's `keyFor` passes it.
    */
-  readonly discriminator?: 'method' | 'stream' | undefined;
+  readonly stream?: boolean | undefined;
+  /**
+   * discriminator tells apart queries of the same kind whose routes collide,
+   * so that each keeps its own cache entry: 'method' puts `$method: '<VERB>'`
+   * in the key's trailing object, after `$stream` when there is one.
+   */
+  readonly discriminator?: 'method' | undefined;
 }
 
 /** QueryFlags tune one generated query or stream. */
@@ -37,6 +43,11 @@ export interface QueryFlags extends KeyFlags {
    * accepts `undefined`, which disables it (a dependent query).
    */
   readonly required?: boolean | undefined;
+  /**
+   * void is true for a read whose method has no result: its `queryFn`
+   * resolves to `null`, since TanStack Query rejects `undefined` as data.
+   */
+  readonly void?: boolean | undefined;
 }
 
 /** QueryFunctionContextLike is the part of TanStack's query function context the helpers read. */
@@ -111,9 +122,15 @@ export interface RawMutationVariables<P> {
   body: BodyInit;
 }
 
+/** InvalidateFilters are the filters a mutation passes to `invalidateQueries`; TanStack applies both. */
+export interface InvalidateFilters {
+  queryKey: QueryKey;
+  predicate?: (query: { queryKey: QueryKey }) => boolean;
+}
+
 /** QueryClientLike is the part of TanStack's `QueryClient` a mutation uses. */
 export interface QueryClientLike {
-  invalidateQueries(filters: { queryKey: QueryKey }): Promise<unknown>;
+  invalidateQueries(filters: InvalidateFilters): Promise<unknown>;
 }
 
 /** MutationParams are the arguments of a mutation besides the client. */
@@ -146,10 +163,10 @@ type RawEndpoint<P, R> = (client: Client, payload: P, body: BodyInit, options?: 
 /** PayloadOf is the local payload type of a request schema; `undefined` without one. */
 export type PayloadOf<S extends z.ZodType | null> = S extends z.ZodType ? z.output<S> : undefined;
 
-/** QueryBuilder is a generated `xyzQuery`. */
+/** QueryBuilder is a generated `xyzQuery`; a void read's data is `null`. */
 export type QueryBuilder<P, T, F extends QueryFlags> = F extends { required: true }
-  ? (client: Client, payload: P | undefined) => ReadQueryOptions<T>
-  : (client: Client, payload?: P) => ReadQueryOptions<T>;
+  ? (client: Client, payload: P | undefined) => ReadQueryOptions<F extends { void: true } ? null : T>
+  : (client: Client, payload?: P) => ReadQueryOptions<F extends { void: true } ? null : T>;
 
 /**
  * StreamBuilder is a generated stream `xyzQuery`. The payload is a required
@@ -163,6 +180,18 @@ export type StreamBuilder<P, TEvent> = <TData = TEvent[], Q extends QueryFunctio
 
 /** MutationBuilder is a generated `xyzMutation`. */
 export type MutationBuilder<V, T> = (client: Client, params?: MutationParams) => MutationOptions<V, T>;
+
+/*
+ * Keys. The grammar below (ADR 0006) is shared with the generator, which
+ * renders the same shapes into the state cards (`keySource` and
+ * `pathKeyParts` in plugin/typescript/internal/tsgen/build_query.go): change
+ * one, change the other.
+ *
+ *   key      = [...segments, trailing?]
+ *   segments = the route split on '/', each parameter replaced by its raw
+ *              wire value (null when there is none)
+ *   trailing = { $stream?: true, $method?: VERB, ...inputs, $disabled?/$invalid?: true }
+ */
 
 /** pathSegments splits a goa path template, dropping empty segments. */
 function pathSegments(template: string): string[] {
@@ -300,9 +329,9 @@ function inputsOf(spec: EndpointSpec, wire: unknown): unknown {
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-/** trailing adds the discriminator to the inputs of a key. */
+/** trailing adds the markers to the inputs of a key. */
 function trailing(spec: EndpointSpec, inputs: unknown, options?: KeyFlags): unknown {
-  const mark = discriminatorOf(spec, options);
+  const mark = markerOf(spec, options);
   if (!mark) {
     return inputs;
   }
@@ -316,16 +345,28 @@ function trailing(spec: EndpointSpec, inputs: unknown, options?: KeyFlags): unkn
   return { ...mark, $value: inputs };
 }
 
-/** discriminatorOf is the entry the discriminator puts first in the trailing object, if any. */
-function discriminatorOf(spec: EndpointSpec, options?: KeyFlags): Record<string, unknown> | undefined {
-  switch (options?.discriminator) {
-    case 'method':
-      return { $method: spec.method };
-    case 'stream':
-      return { $stream: true };
-    default:
-      return undefined;
+/**
+ * markerOf is what comes first in the trailing object: `$stream` for a
+ * stream, then `$method` for a discriminated key; undefined when neither.
+ */
+function markerOf(spec: EndpointSpec, options?: KeyFlags): Record<string, unknown> | undefined {
+  if (!options?.stream && options?.discriminator !== 'method') {
+    return undefined;
   }
+  const mark: Record<string, unknown> = {};
+  if (options.stream) {
+    mark['$stream'] = true;
+  }
+  if (options.discriminator === 'method') {
+    mark['$method'] = spec.method;
+  }
+  return mark;
+}
+
+/** isStreamKey reports whether a key is a stream's: its last element carries `$stream: true`. */
+export function isStreamKey(key: QueryKey): boolean {
+  const last = key[key.length - 1];
+  return isRecord(last) && last['$stream'] === true;
 }
 
 /**
@@ -346,7 +387,12 @@ export function queryKeyFor(spec: EndpointSpec, wire: unknown, options?: KeyFlag
   return key;
 }
 
-/** keyPrefixFor returns the static segments of a path up to its first parameter. */
+/**
+ * keyPrefixFor returns the static segments of a path up to its first
+ * parameter. A route that starts with a parameter has no such segment: it
+ * gets the route with `null` for every parameter instead, never the empty
+ * key, which would match every query.
+ */
 export function keyPrefixFor(spec: EndpointSpec): QueryKey {
   const out: string[] = [];
   for (const segment of pathSegments(spec.path)) {
@@ -355,7 +401,15 @@ export function keyPrefixFor(spec: EndpointSpec): QueryKey {
     }
     out.push(segment);
   }
+  if (out.length === 0) {
+    return substitute(spec, spec.path, undefined, false);
+  }
   return out;
+}
+
+/** hasParams reports whether a route has a path parameter. */
+function hasParams(spec: EndpointSpec): boolean {
+  return pathSegments(spec.path).some((s) => s.includes('{'));
 }
 
 /**
@@ -372,7 +426,7 @@ function fallbackKeyFor(
   options?: KeyFlags,
 ): QueryKey {
   const key = substitute(spec, spec.path, undefined, false);
-  key.push({ ...discriminatorOf(spec, options), [sentinel]: true });
+  key.push({ ...markerOf(spec, options), [sentinel]: true });
   return key;
 }
 
@@ -396,15 +450,27 @@ function disabledQueryFn(): Promise<never> {
 
 /**
  * keyFor builds a generated `xyzKey`: with a payload, the full key of that
- * request; without, the key prefix, which matches every request of the
- * method (and of any method under the same path).
+ * request; without, an invalidation prefix that matches every request of
+ * the method. For a route with parameters that prefix is the static
+ * segments, which other methods under the same path share: it is not a
+ * cache key. For a route without parameters it is the route followed by the
+ * key's markers (`$stream`, `$method`) when it has some, so that it never
+ * equals another query's exact key; TanStack matches the marker object as a
+ * subset of a longer key's trailing object.
  */
 export function keyFor<S extends z.ZodType | null>(
   spec: EndpointSpec,
   schema: S,
   flags: KeyFlags = {},
 ): (payload?: PayloadOf<S>) => QueryKey {
-  return (payload) => (payload === undefined ? keyPrefixFor(spec) : keyOf(spec, schema, payload, flags).key);
+  return (payload) => {
+    if (payload !== undefined) {
+      return keyOf(spec, schema, payload, flags).key;
+    }
+    const prefix = keyPrefixFor(spec);
+    const mark = markerOf(spec, flags);
+    return hasParams(spec) || !mark ? prefix : [...prefix, mark];
+  };
 }
 
 /**
@@ -429,6 +495,15 @@ export function queryFor<P, R extends Result<unknown, unknown>, const F extends 
       const error = keyed.error;
       return { queryKey: keyed.key, queryFn: () => Promise.reject(error) };
     }
+    if (flags.void) {
+      return {
+        queryKey: keyed.key,
+        queryFn: async ({ signal }) => {
+          await unwrapAsync(fn(client, payload as P, { signal }));
+          return null as ValueOf<R>;
+        },
+      };
+    }
     return {
       queryKey: keyed.key,
       queryFn: ({ signal }) => unwrapAsync(fn(client, payload as P, { signal })) as Promise<ValueOf<R>>,
@@ -448,6 +523,7 @@ type EventOf<R> = ValueOf<R> extends AsyncIterable<infer E> ? E : never;
  * and `initialValue` are passed through.
  *
  * Aborting the query's signal (unmount, `cancelQueries`) closes the stream.
+ * The key always carries `$stream: true`, so mutations never invalidate it.
  */
 export function streamFor<P, R extends Result<unknown, unknown>, const F extends QueryFlags>(
   fn: Endpoint<P, R>,
@@ -461,22 +537,27 @@ export function streamFor<P, R extends Result<unknown, unknown>, const F extends
     params: StreamQueryParams<EventOf<R>, unknown, QueryFunctionLike>,
   ): StreamQueryOptions<QueryFunctionLike> => {
     const { streamedQuery, ...rest } = params;
-    const disabled = payload === undefined && !!flags.required;
-    const keyed: Keyed = disabled
-      ? { ok: true, key: fallbackKeyFor(spec, '$disabled', flags) }
-      : keyOf(spec, schema, payload, flags);
-    const streamFn: StreamFn<EventOf<R>> = disabled
-      ? disabledQueryFn
-      : !keyed.ok
-        ? () => Promise.reject(keyed.error)
-        : ({ signal }) =>
-            unwrapAsync(fn(client, payload as P, { signal })) as Promise<AsyncIterable<EventOf<R>>>;
-    const queryFn = streamedQuery({ ...rest, streamFn } as StreamedQueryParams<EventOf<R>, unknown>);
-    const out: StreamQueryOptions<QueryFunctionLike> = { queryKey: keyed.key, queryFn, staleTime: Infinity };
-    if (disabled) {
-      out.enabled = false;
+    const keyFlags: QueryFlags = { ...flags, stream: true };
+    const open = (
+      queryKey: QueryKey,
+      streamFn: StreamFn<EventOf<R>>,
+    ): StreamQueryOptions<QueryFunctionLike> => ({
+      queryKey,
+      queryFn: streamedQuery({ ...rest, streamFn } as StreamedQueryParams<EventOf<R>, unknown>),
+      staleTime: Infinity,
+    });
+    if (payload === undefined && flags.required) {
+      return { ...open(fallbackKeyFor(spec, '$disabled', keyFlags), disabledQueryFn), enabled: false };
     }
-    return out;
+    const keyed = keyOf(spec, schema, payload, keyFlags);
+    if (!keyed.ok) {
+      const error = keyed.error;
+      return open(keyed.key, () => Promise.reject(error));
+    }
+    return open(
+      keyed.key,
+      ({ signal }) => unwrapAsync(fn(client, payload as P, { signal })) as Promise<AsyncIterable<EventOf<R>>>,
+    );
   };
   return build as unknown as StreamBuilder<P, EventOf<R>>;
 }
@@ -518,14 +599,20 @@ export function invalidatesFor(
       const encoded = encode(schema, (payload ?? {}) as z.output<z.ZodType>);
       wire = encoded.ok ? encoded.value : undefined;
     }
-    return templates.map((template) => substitute(spec, template, wire, true));
+    // A key stops at the first parameter the payload lacks; an empty key
+    // would match every query, so it is dropped.
+    return templates
+      .map((template) => substitute(spec, template, wire, true))
+      .filter((key) => key.length > 0);
   };
 }
 
 /**
  * mutationFor builds a generated `xyzMutation`: `(client, params?)` returning
  * `{ mutationFn }` for `useMutation`, plus an `onSuccess` that invalidates
- * the keys `invalidates` computes when `params.queryClient` is given.
+ * the keys `invalidates` computes when `params.queryClient` is given. Stream
+ * keys are left alone: invalidating an active stream would abort it and open
+ * it again from the start.
  */
 export function mutationFor<P, R extends Result<unknown, unknown>>(
   fn: RawEndpoint<P, R>,
@@ -557,7 +644,9 @@ export function mutationFor(
       mutationFn,
       onSuccess: async (_data, variables) => {
         await Promise.all(
-          invalidates(variables as never).map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+          invalidates(variables as never).map((queryKey) =>
+            queryClient.invalidateQueries({ queryKey, predicate: (query) => !isStreamKey(query.queryKey) }),
+          ),
         );
       },
     };

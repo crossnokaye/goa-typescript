@@ -14,8 +14,9 @@ import { countThings, countThingsSpec } from './count-things.js';
 export const countThingsQuery = queryFor(countThings, countThingsSpec, null, {});
 
 /**
- * countThingsKey returns the key of a countThings request, or without a payload the prefix
- * `["count"]` that every one of them starts with.
+ * countThingsKey returns the key of a countThings request. Without a payload it returns
+ * `["count"]`, an invalidation prefix that matches every countThings request and is no other
+ * query's key.
  *
  * - Owner: server
  * - Source: `["count"]`

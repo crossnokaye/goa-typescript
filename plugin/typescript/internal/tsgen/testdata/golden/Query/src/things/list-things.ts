@@ -32,7 +32,12 @@ export const ListThingsPayload = z.object({
 export type ListThingsResult = Thing[];
 export const ListThingsResult = z.array(Thing) satisfies z.ZodType<ListThingsResult>;
 
-/** listThingsSpec is the transport mapping of listThings. */
+/**
+ * listThingsSpec is the transport mapping of listThings, for the sibling query file; it is not a
+ * public contract.
+ *
+ * @internal
+ */
 export const listThingsSpec: EndpointSpec = {
   method: 'GET',
   path: '/things',

@@ -14,7 +14,7 @@ export const updateThingInvalidates = invalidatesFor(updateThingSpec, UpdateThin
 
 /**
  * updateThingMutation returns the mutation options of updateThing, for `useMutation`. Given
- * `{ queryClient }`, `onSuccess` invalidates the keys below.
+ * `{ queryClient }`, `onSuccess` invalidates the keys below (never a stream's).
  *
  * - Owner: server
  * - Invalidates: `["things"]`

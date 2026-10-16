@@ -10,19 +10,20 @@ import { watchThing, WatchThingPayload, watchThingSpec } from './watch-thing.js'
  * A payload of `undefined` returns a disabled query (`enabled: false`).
  *
  * - Owner: server
- * - Source: `["things", id, "events", { delay_ms? }]`
+ * - Source: `["things", id, "events", { $stream: true, delay_ms? }]`
  * - Writable: no
- * - Mutations & invalidation: `updateThingMutation`, `archiveThingMutation`
+ * - Mutations & invalidation: none (mutations never invalidate streams)
  */
 export const watchThingQuery = streamFor(watchThing, watchThingSpec, WatchThingPayload, { required: true });
 
 /**
- * watchThingKey returns the key of a watchThing request, or without a payload the prefix
- * `["things"]` that every one of them starts with.
+ * watchThingKey returns the key of a watchThing request. Without a payload it returns
+ * `["things"]`, an invalidation prefix that other methods under the same path share:
+ * it is not a cache key.
  *
  * - Owner: server
- * - Source: `["things", id, "events", { delay_ms? }]`
+ * - Source: `["things", id, "events", { $stream: true, delay_ms? }]`
  * - Writable: no
- * - Mutations & invalidation: `updateThingMutation`, `archiveThingMutation`
+ * - Mutations & invalidation: none (mutations never invalidate streams)
  */
-export const watchThingKey = keyFor(watchThingSpec, WatchThingPayload);
+export const watchThingKey = keyFor(watchThingSpec, WatchThingPayload, { stream: true });

@@ -70,6 +70,8 @@ func TestBuildQueryClassification(t *testing.T) {
 		"watch_thing":    {QueryStream},
 		"ticks":          {QueryStream},
 		"feed":           {QueryRead, QueryStream},
+		"health":         {QueryRead},
+		"run_job":        {QueryMutation},
 	})
 	wantEqual(t, "none", things.QueryNone, []SkippedEndpoint{
 		{Method: "download_content", Reason: "the response body is not decoded (SkipResponseBodyEncodeDecode)"},
@@ -95,30 +97,63 @@ func TestBuildQueryClassification(t *testing.T) {
 	wantEqual(t, "required", query(t, endpoint(t, things, "get_thing"), "getThing").Required, true)
 	wantEqual(t, "optional", query(t, endpoint(t, things, "list_things"), "listThings").Required, false)
 	wantEqual(t, "none", query(t, endpoint(t, things, "count_things"), "countThings").Required, false)
+	wantEqual(t, "void", query(t, endpoint(t, things, "health"), "health").Void, true)
+	wantEqual(t, "not void", query(t, endpoint(t, things, "count_things"), "countThings").Void, false)
+	wantEqual(t, "a stream is never void", query(t, endpoint(t, things, "ticks"), "ticks").Void, false)
 }
 
 func TestBuildQueryInvalidation(t *testing.T) {
 	pkg := build(t, testdata.QueryDSL)
 	things := service(t, pkg, "things")
 	for method, want := range map[string][]string{
-		"update_thing":   {"/things"},             // PUT /things/{id}: the trailing parameter goes
-		"delete_label":   {"/things/{id}/labels"}, // trailing parameter only
-		"archive_thing":  {"/things"},             // three methods named, one prefix
-		"touch":          nil,                     // Meta("typescript:invalidates", "")
-		"upload_content": {"/things/{id}/content"},
+		"update_thing":   {"/things"},      // PUT /things/{id}: the trailing parameter goes
+		"delete_label":   {"/things/{id}"}, // no read under /things/{id}/labels: up to get_thing's route
+		"archive_thing":  {"/things"},      // three methods named, one prefix
+		"touch":          nil,              // Meta("typescript:invalidates", "")
+		"upload_content": {"/things/{id}"}, // the raw download under /content is no read
+		"run_job":        {"/jobs"},        // no read at all: the shortest prefix, with a warning
 	} {
 		ep := endpoint(t, things, method)
 		wantEqual(t, method, ep.Queries[0].Invalidates, want)
 	}
+	wantEqual(t, "no query", query(t, endpoint(t, things, "run_job"), "runJob").InvalidatesNoQuery, true)
+	wantEqual(t, "a query", query(t, endpoint(t, things, "delete_label"), "deleteLabel").InvalidatesNoQuery, false)
+	wantEqual(t, "warnings", pkg.Warnings, []string{`service "things": mutation "run_job" invalidates no query`})
+
 	get := query(t, endpoint(t, things, "get_thing"), "getThing")
-	wantEqual(t, "invalidated by", get.InvalidatedBy, []string{"`updateThingMutation`", "`archiveThingMutation`"})
+	wantEqual(t, "invalidated by", get.InvalidatedBy, []string{
+		"`updateThingMutation`", "`deleteLabelMutation`", "`archiveThingMutation`", "`uploadContentMutation`",
+	})
 	fetch := query(t, endpoint(t, service(t, pkg, "legacy"), "fetch_thing"), "fetchThing")
-	wantEqual(t, "invalidated across services", fetch.InvalidatedBy,
-		[]string{"`things.updateThingMutation`", "`things.archiveThingMutation`"})
-	labels := defaultInvalidation("/things/{id}/labels/{label_id}")
-	wantEqual(t, "default", labels, "/things/{id}/labels")
-	wantEqual(t, "static", defaultInvalidation("/things/{id}/archive"), "/things/{id}/archive")
+	wantEqual(t, "invalidated across services", fetch.InvalidatedBy, []string{
+		"`things.updateThingMutation`", "`things.deleteLabelMutation`", "`things.archiveThingMutation`",
+		"`things.uploadContentMutation`",
+	})
+	wantEqual(t, "streams are never invalidated", query(t, endpoint(t, things, "watch_thing"), "watchThing").InvalidatedBy,
+		[]string(nil))
 	wantEqual(t, "prefix", staticPrefix("/things/{id}/labels"), "/things")
+}
+
+func TestDefaultInvalidationWalksToARead(t *testing.T) {
+	reads := []string{"/things", "/things/{id}", "/orgs/{org}/members/{member}"}
+	for _, c := range []struct {
+		path, want string
+		ok         bool
+	}{
+		{"/things/{id}", "/things", true},                          // trailing parameter stripped
+		{"/things", "/things", true},                               // POST on the list
+		{"/things/{id}/labels/{lid}", "/things/{id}", true},        // labels has no read: one level up
+		{"/things/{thing_id}/content", "/things/{thing_id}", true}, // its own parameter matches any name
+		{"/things/search", "/things", true},                        // a static leaf walks up too
+		{"/orgs/{o}/members/{m}/roles", "/orgs/{o}/members/{m}", true},
+		{"/orgs/{o}/invites", "/orgs/{o}", true}, // a prefix of a read's route
+		{"/jobs/{id}/run", "/jobs", false},       // no read: the shortest, one segment
+		{"/{id}", "/{id}", false},                // never below one segment
+		{"/", "", false},                         // nothing to keep
+	} {
+		got, ok := defaultInvalidation(c.path, reads)
+		wantEqual(t, c.path, []any{got, ok}, []any{c.want, c.ok})
+	}
 }
 
 func TestBuildQueryCollisions(t *testing.T) {
@@ -131,7 +166,7 @@ func TestBuildQueryCollisions(t *testing.T) {
 		{"get_thing", "getThing", ""},         // the GET keeps its clean key
 		{"head_thing", "headThing", "method"}, // {thing_id} is the same slot as {id}
 		{"feed", "feed", ""},
-		{"feed", "feedStream", "stream"}, // the stream of a mixed method shares the GET route
+		{"feed", "feedStream", ""}, // a stream never collides with a read
 		{"list_things", "listThings", ""},
 		{"watch_thing", "watchThing", ""},
 	} {
@@ -146,9 +181,9 @@ func TestBuildQueryCollisions(t *testing.T) {
 	wantEqual(t, "source", fetch.Source, `["things", key, { $method: "POST", fields? }]`)
 	feed := endpoint(t, things, "feed")
 	wantEqual(t, "stream source", query(t, feed, "feedStream").Source, `["feed", { $stream: true, kind? }]`)
-	wantEqual(t, "clean key marks", query(t, feed, "feed").OtherMarks, []string{"`$stream`"})
-	wantEqual(t, "get marks", query(t, endpoint(t, things, "get_thing"), "getThing").OtherMarks,
-		[]string{"`$method`"})
+	wantEqual(t, "a mixed method is no collision", query(t, feed, "feed").Collisions, []string(nil))
+	wantEqual(t, "stream with a payload", query(t, endpoint(t, things, "watch_thing"), "watchThing").Source,
+		`["things", id, "events", { $stream: true, delay_ms? }]`)
 	wantEqual(t, "get source", query(t, endpoint(t, things, "get_thing"), "getThing").Source,
 		`["things", id, { tags?, verbose?, since?, trace? }]`)
 
@@ -176,12 +211,32 @@ func TestBuildQueryCollisions(t *testing.T) {
 				Result(String)
 				HTTP(func() { GET("/items/other") })
 			})
+			Method("watch", func() {
+				StreamingResult(String)
+				HTTP(func() {
+					GET("/feed")
+					ServerSentEvents()
+				})
+			})
+			Method("watch_filtered", func() {
+				Payload(func() { Attribute("kind", String) })
+				StreamingResult(String)
+				HTTP(func() {
+					POST("/feed")
+					ServerSentEvents()
+				})
+			})
 		})
 	})
 	svc := service(t, pkg, "svc")
 	wantEqual(t, "peek", query(t, endpoint(t, svc, "peek"), "peek").Discriminator, "method")
 	wantEqual(t, "lookup", query(t, endpoint(t, svc, "lookup"), "lookup").Discriminator, "method")
 	wantEqual(t, "other", query(t, endpoint(t, svc, "other"), "other").Discriminator, "")
+	// Streams collide with streams: the POST one is told apart by its verb.
+	wantEqual(t, "watch", query(t, endpoint(t, svc, "watch"), "watch").Discriminator, "")
+	filtered := query(t, endpoint(t, svc, "watch_filtered"), "watchFiltered")
+	wantEqual(t, "watch_filtered", filtered.Discriminator, "method")
+	wantEqual(t, "stream source", filtered.Source, `["feed", { $stream: true, $method: "POST", kind? }]`)
 }
 
 func TestBuildQueryErrors(t *testing.T) {
@@ -284,6 +339,22 @@ func TestBuildQueryErrors(t *testing.T) {
 				Method("reset", func() { HTTP(func() { POST("/reset") }) })
 			})
 		}, `names "reset", which has no query options`},
+		"invalidates a route without a static prefix": {func() {
+			enable()
+			Service("svc", func() {
+				Method("get", func() {
+					Payload(func() {
+						Attribute("id", String)
+						Required("id")
+					})
+					HTTP(func() { GET("/{id}") })
+				})
+				Method("set", func() {
+					Meta("typescript:invalidates", "get")
+					HTTP(func() { POST("/set") })
+				})
+			})
+		}, `cannot invalidate "get": its route has no static prefix`},
 		"invalidates on a query": {func() {
 			enable()
 			Service("svc", func() {

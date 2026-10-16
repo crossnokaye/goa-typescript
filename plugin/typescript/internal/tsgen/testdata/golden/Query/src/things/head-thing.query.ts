@@ -10,19 +10,20 @@ import { headThing, HeadThingPayload, headThingSpec } from './head-thing.js';
  * - Owner: server
  * - Source: `["things", thing_id, { $method: "HEAD" }]`
  * - Writable: no
- * - Mutations & invalidation: `updateThingMutation`, `archiveThingMutation`
+ * - Mutations & invalidation: `updateThingMutation`, `deleteLabelMutation`, `archiveThingMutation`, `uploadContentMutation`
  * - Collides with `POST /things/{key}` (`legacy.fetchThingQuery`), `GET /things/{id}` (`getThingQuery`): the key carries `$method: "HEAD"`
  */
 export const headThingQuery = queryFor(headThing, headThingSpec, HeadThingPayload, { required: true, discriminator: 'method' });
 
 /**
- * headThingKey returns the key of a headThing request, or without a payload the prefix
- * `["things"]` that every one of them starts with.
+ * headThingKey returns the key of a headThing request. Without a payload it returns
+ * `["things"]`, an invalidation prefix that other methods under the same path share:
+ * it is not a cache key.
  *
  * - Owner: server
  * - Source: `["things", thing_id, { $method: "HEAD" }]`
  * - Writable: no
- * - Mutations & invalidation: `updateThingMutation`, `archiveThingMutation`
+ * - Mutations & invalidation: `updateThingMutation`, `deleteLabelMutation`, `archiveThingMutation`, `uploadContentMutation`
  * - Collides with `POST /things/{key}` (`legacy.fetchThingQuery`), `GET /things/{id}` (`getThingQuery`): the key carries `$method: "HEAD"`
  */
 export const headThingKey = keyFor(headThingSpec, HeadThingPayload, { discriminator: 'method' });

@@ -448,6 +448,15 @@ var _ = Service("toy", func() {
 		})
 	})
 
+	Method("ping", func() {
+		Description("A read without a result: its query data is null.")
+		NoSecurity()
+		HTTP(func() {
+			GET("/ping")
+			Response(StatusNoContent)
+		})
+	})
+
 	Method("thing_blob", func() {
 		Description("A result made of bytes.")
 		PayloadWithToken(nil)

@@ -26,7 +26,12 @@ export const UploadContentPayload = z.object({
   content_type: z.string().optional(),
 }) satisfies z.ZodType<UploadContentPayload>;
 
-/** uploadContentSpec is the transport mapping of uploadContent. */
+/**
+ * uploadContentSpec is the transport mapping of uploadContent, for the sibling query file; it is not a
+ * public contract.
+ *
+ * @internal
+ */
 export const uploadContentSpec: EndpointSpec = {
   method: 'PUT',
   path: '/things/{id}/content',

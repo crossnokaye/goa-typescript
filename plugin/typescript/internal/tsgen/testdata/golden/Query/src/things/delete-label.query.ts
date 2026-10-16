@@ -8,15 +8,15 @@ import { deleteLabel, DeleteLabelPayload, deleteLabelSpec } from './delete-label
  * invalidation by hand.
  *
  * - Owner: server
- * - Invalidates: `["things", id, "labels"]`
+ * - Invalidates: `["things", id]`
  */
-export const deleteLabelInvalidates = invalidatesFor(deleteLabelSpec, DeleteLabelPayload, ['/things/{id}/labels']);
+export const deleteLabelInvalidates = invalidatesFor(deleteLabelSpec, DeleteLabelPayload, ['/things/{id}']);
 
 /**
  * deleteLabelMutation returns the mutation options of deleteLabel, for `useMutation`. Given
- * `{ queryClient }`, `onSuccess` invalidates the keys below.
+ * `{ queryClient }`, `onSuccess` invalidates the keys below (never a stream's).
  *
  * - Owner: server
- * - Invalidates: `["things", id, "labels"]`
+ * - Invalidates: `["things", id]`
  */
 export const deleteLabelMutation = mutationFor(deleteLabel, deleteLabelInvalidates);

@@ -14,8 +14,9 @@ import { listThings, ListThingsPayload, listThingsSpec } from './list-things.js'
 export const listThingsQuery = queryFor(listThings, listThingsSpec, ListThingsPayload, {});
 
 /**
- * listThingsKey returns the key of a listThings request, or without a payload the prefix
- * `["things"]` that every one of them starts with.
+ * listThingsKey returns the key of a listThings request. Without a payload it returns
+ * `["things"]`, an invalidation prefix that matches every listThings request and is no other
+ * query's key.
  *
  * - Owner: server
  * - Source: `["things", { kind?, limit? }]`

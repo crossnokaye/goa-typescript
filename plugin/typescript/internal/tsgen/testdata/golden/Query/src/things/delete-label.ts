@@ -26,7 +26,12 @@ export const DeleteLabelPayload = z.object({
   label_id: z.string(),
 }) satisfies z.ZodType<DeleteLabelPayload>;
 
-/** deleteLabelSpec is the transport mapping of deleteLabel. */
+/**
+ * deleteLabelSpec is the transport mapping of deleteLabel, for the sibling query file; it is not a
+ * public contract.
+ *
+ * @internal
+ */
 export const deleteLabelSpec: EndpointSpec = {
   method: 'DELETE',
   path: '/things/{id}/labels/{label_id}',

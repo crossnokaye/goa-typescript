@@ -31,7 +31,12 @@ export const SearchThingsPayload = z.object({
 export type SearchThingsResult = Thing[];
 export const SearchThingsResult = z.array(Thing) satisfies z.ZodType<SearchThingsResult>;
 
-/** searchThingsSpec is the transport mapping of searchThings. */
+/**
+ * searchThingsSpec is the transport mapping of searchThings, for the sibling query file; it is not a
+ * public contract.
+ *
+ * @internal
+ */
 export const searchThingsSpec: EndpointSpec = {
   method: 'POST',
   path: '/things/search',

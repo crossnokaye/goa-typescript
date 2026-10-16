@@ -1578,7 +1578,8 @@ var WSSecurityDSL = func() {
 // reads with path, query and header parameters, a HEAD and a POST read that
 // collide with a GET (the POST in another service), mutations with default
 // and declared invalidation, a raw upload, a raw download, Server-Sent
-// Events, WebSocket streams and a mixed method.
+// Events, WebSocket streams, a mixed method, a void read and a mutation no
+// query lives under.
 var QueryDSL = func() {
 	var Thing = Type("Thing", func() {
 		Attribute("id", String)
@@ -1772,6 +1773,24 @@ var QueryDSL = func() {
 				GET("/feed")
 				Param("kind")
 				ServerSentEvents()
+			})
+		})
+		Method("health", func() {
+			Description("A read without a result: its query data is null.")
+			HTTP(func() {
+				GET("/health")
+				Response(StatusNoContent)
+			})
+		})
+		Method("run_job", func() {
+			Description("No query lives under its route: goa gen warns.")
+			Payload(func() {
+				Attribute("id", String)
+				Required("id")
+			})
+			HTTP(func() {
+				POST("/jobs/{id}/run")
+				Response(StatusNoContent)
 			})
 		})
 		Method("ping", func() {

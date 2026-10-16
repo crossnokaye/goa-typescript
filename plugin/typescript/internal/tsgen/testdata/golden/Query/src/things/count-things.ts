@@ -19,7 +19,12 @@ import {
 export type CountThingsResult = number;
 export const CountThingsResult = z.int() satisfies z.ZodType<CountThingsResult>;
 
-/** countThingsSpec is the transport mapping of countThings. */
+/**
+ * countThingsSpec is the transport mapping of countThings, for the sibling query file; it is not a
+ * public contract.
+ *
+ * @internal
+ */
 export const countThingsSpec: EndpointSpec = {
   method: 'GET',
   path: '/count',

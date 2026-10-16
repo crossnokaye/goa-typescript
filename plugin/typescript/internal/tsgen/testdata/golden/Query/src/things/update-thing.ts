@@ -27,7 +27,12 @@ export const UpdateThingPayload = z.object({
   name: z.string(),
 }) satisfies z.ZodType<UpdateThingPayload>;
 
-/** updateThingSpec is the transport mapping of updateThing. */
+/**
+ * updateThingSpec is the transport mapping of updateThing, for the sibling query file; it is not a
+ * public contract.
+ *
+ * @internal
+ */
 export const updateThingSpec: EndpointSpec = {
   method: 'PUT',
   path: '/things/{id}',

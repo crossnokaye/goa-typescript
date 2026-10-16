@@ -203,6 +203,8 @@ func (s *toyService) HeadThing(_ context.Context, p *toy.HeadThingPayload) (*toy
 	return &toy.HeadThingResult{Etag: `"` + p.ThingID + `-v1"`}, nil
 }
 
+func (s *toyService) Ping(context.Context) error { return nil }
+
 func (s *toyService) GetThingViewed(_ context.Context, p *toy.GetThingViewedPayload) (*toy.ThingWithViews, string, error) {
 	return &toy.ThingWithViews{ID: "viewed", Name: "viewed-thing", Secret: "s3cr3t"}, p.View, nil
 }

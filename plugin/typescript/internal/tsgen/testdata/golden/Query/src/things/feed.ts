@@ -33,7 +33,12 @@ export const FeedPayload = z.object({
 export type FeedResult = Thing[];
 export const FeedResult = z.array(Thing) satisfies z.ZodType<FeedResult>;
 
-/** feedSpec is the transport mapping of feed. */
+/**
+ * feedSpec is the transport mapping of feed, for the sibling query file; it is not a
+ * public contract.
+ *
+ * @internal
+ */
 export const feedSpec: EndpointSpec = {
   method: 'GET',
   path: '/feed',
@@ -44,7 +49,12 @@ export const feedSpec: EndpointSpec = {
   security: [],
 };
 
-/** feedStreamSpec is the transport mapping of feedStream. */
+/**
+ * feedStreamSpec is the transport mapping of feedStream, for the sibling query file; it is not a
+ * public contract.
+ *
+ * @internal
+ */
 export const feedStreamSpec: EndpointSpec = {
   method: 'GET',
   path: '/feed',

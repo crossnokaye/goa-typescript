@@ -10,19 +10,18 @@ import { feed, FeedPayload, feedSpec, feedStream, feedStreamSpec } from './feed.
  * - Source: `["feed", { kind? }]`
  * - Writable: no
  * - Mutations & invalidation: none
- * - Shares its path with `GET /feed` (`feedStreamQuery`), told apart by `$stream`
  */
 export const feedQuery = queryFor(feed, feedSpec, FeedPayload, {});
 
 /**
- * feedKey returns the key of a feed request, or without a payload the prefix
- * `["feed"]` that every one of them starts with.
+ * feedKey returns the key of a feed request. Without a payload it returns
+ * `["feed"]`, an invalidation prefix that matches every feed request and is no other
+ * query's key.
  *
  * - Owner: server
  * - Source: `["feed", { kind? }]`
  * - Writable: no
  * - Mutations & invalidation: none
- * - Shares its path with `GET /feed` (`feedStreamQuery`), told apart by `$stream`
  */
 export const feedKey = keyFor(feedSpec, FeedPayload);
 
@@ -34,19 +33,18 @@ export const feedKey = keyFor(feedSpec, FeedPayload);
  * - Owner: server
  * - Source: `["feed", { $stream: true, kind? }]`
  * - Writable: no
- * - Mutations & invalidation: none
- * - Collides with `GET /feed` (`feedQuery`): the key carries `$stream: true`
+ * - Mutations & invalidation: none (mutations never invalidate streams)
  */
-export const feedStreamQuery = streamFor(feedStream, feedStreamSpec, FeedPayload, { discriminator: 'stream' });
+export const feedStreamQuery = streamFor(feedStream, feedStreamSpec, FeedPayload, {});
 
 /**
- * feedStreamKey returns the key of a feedStream request, or without a payload the prefix
- * `["feed"]` that every one of them starts with.
+ * feedStreamKey returns the key of a feedStream request. Without a payload it returns
+ * `["feed", { $stream: true }]`, an invalidation prefix that matches every feedStream request and is no other
+ * query's key.
  *
  * - Owner: server
  * - Source: `["feed", { $stream: true, kind? }]`
  * - Writable: no
- * - Mutations & invalidation: none
- * - Collides with `GET /feed` (`feedQuery`): the key carries `$stream: true`
+ * - Mutations & invalidation: none (mutations never invalidate streams)
  */
-export const feedStreamKey = keyFor(feedStreamSpec, FeedPayload, { discriminator: 'stream' });
+export const feedStreamKey = keyFor(feedStreamSpec, FeedPayload, { stream: true });

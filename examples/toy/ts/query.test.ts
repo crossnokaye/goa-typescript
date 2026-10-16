@@ -168,13 +168,35 @@ describe('read queries', () => {
     expect(list.map((t) => t.id)).toEqual(['one', 'two']);
     expect(events.map((t) => t.id)).toEqual(['one', 'two']);
   });
+
+  it('writes through a stream key without a payload without touching the plain entry', async () => {
+    const qc = queryClient();
+    const plain = toy.streamOrListQuery(client());
+    const list = await qc.fetchQuery(plain);
+    const prefix = toy.streamOrListStreamKey();
+    expect(prefix).toEqual(['stream-or-list', { $stream: true }]);
+    expect(prefix).not.toEqual(toy.streamOrListKey());
+    qc.setQueryData(prefix, [{ id: 'written' }]);
+    expect(qc.getQueryData(plain.queryKey)).toBe(list);
+    expect(qc.getQueryData(prefix)).toEqual([{ id: 'written' }]);
+  });
+
+  it('resolves a read without a result to null', async () => {
+    const qc = queryClient();
+    const options = toy.pingQuery(client());
+    expect(options.queryKey).toEqual(['ping']);
+    const data = await qc.fetchQuery(options);
+    expectTypeOf(data).toEqualTypeOf<null>();
+    expect(data).toBeNull();
+    expect(qc.getQueryState(options.queryKey)?.status).toBe('success');
+  });
 });
 
 describe('stream queries', () => {
   it('accumulates the events of a Server-Sent Events stream through the real streamedQuery', async () => {
     const qc = queryClient();
     const options = toy.streamThingsSseQuery(client(), { id: 'abc' }, { streamedQuery });
-    expect(options.queryKey).toEqual(['things', 'abc', 'events']);
+    expect(options.queryKey).toEqual(['things', 'abc', 'events', { $stream: true }]);
     expect(options.staleTime).toBe(Infinity);
     const events = await qc.fetchQuery(options);
     expectTypeOf(events).toEqualTypeOf<ThingEvent[]>();
@@ -236,7 +258,7 @@ describe('stream queries', () => {
   it('disables a stream whose required payload is undefined', () => {
     const options = toy.streamThingsSseQuery(client(), undefined, { streamedQuery });
     expect(options.enabled).toBe(false);
-    expect(options.queryKey).toEqual(['things', null, 'events', { $disabled: true }]);
+    expect(options.queryKey).toEqual(['things', null, 'events', { $stream: true, $disabled: true }]);
   });
 });
 
@@ -276,13 +298,42 @@ describe('mutations', () => {
     expect(Object.keys(toy.upsertThingMutation(client()))).toEqual(['mutationFn']);
   });
 
-  it('substitutes path parameters from the variables of a raw upload', async () => {
+  it('substitutes path parameters from the variables of a raw upload, up to a key a read lives under', async () => {
     const qc = queryClient();
+    await qc.fetchQuery(toy.getThingQuery(client(), { id: 'up' }));
+    await qc.fetchQuery(toy.getThingQuery(client(), { id: 'other' }));
     const options = toy.uploadThingMutation(client(), { queryClient: qc });
     const variables = { payload: { id: 'up', content_type: 'text/plain' }, body: 'hello' };
     const result = await new MutationObserver(qc, options).mutate(variables);
     expect(result).toMatchObject({ size: 5, text: 'hello' });
-    expect(toy.uploadThingInvalidates(variables)).toEqual([['things', 'up', 'content']]);
+    // PUT /things/{id}/content: no query lives under its own path, so it invalidates the thing's.
+    expect(toy.uploadThingInvalidates(variables)).toEqual([['things', 'up']]);
+    expect(qc.getQueryState(toy.getThingKey({ id: 'up' }))?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(toy.getThingKey({ id: 'other' }))?.isInvalidated).toBe(false);
+  });
+
+  it('never restarts an open stream', async () => {
+    const qc = queryClient();
+    const rec = spy();
+    const options = toy.streamThingsSseQuery(
+      client({ middleware: [rec.middleware] }),
+      { id: 'slow', delay_ms: 200 },
+      {
+        streamedQuery,
+      },
+    );
+    const observer = new QueryObserver(qc, options);
+    const unsubscribe = observer.subscribe(() => {});
+    await until(() => (qc.getQueryData<ThingEvent[]>(options.queryKey) ?? []).length >= 1);
+
+    await new MutationObserver(qc, toy.upsertThingMutation(client(), { queryClient: qc })).mutate({
+      id: 'other',
+      name: 'renamed',
+    });
+    expect(qc.getQueryState(options.queryKey)?.isInvalidated).toBe(false);
+    expect(rec.requests).toHaveLength(1);
+    expect(rec.requests[0]!.signal.aborted).toBe(false);
+    unsubscribe();
   });
 
   it('rejects with the typed goa error', async () => {

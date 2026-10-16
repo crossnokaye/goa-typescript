@@ -24,7 +24,12 @@ export const ArchiveThingPayload = z.object({
   id: z.string(),
 }) satisfies z.ZodType<ArchiveThingPayload>;
 
-/** archiveThingSpec is the transport mapping of archiveThing. */
+/**
+ * archiveThingSpec is the transport mapping of archiveThing, for the sibling query file; it is not a
+ * public contract.
+ *
+ * @internal
+ */
 export const archiveThingSpec: EndpointSpec = {
   method: 'POST',
   path: '/things/{id}/archive',

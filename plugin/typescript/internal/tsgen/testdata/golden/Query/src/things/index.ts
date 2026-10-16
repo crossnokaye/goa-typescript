@@ -28,6 +28,10 @@ export * from './ticks.query.js';
 export * from './chat.js';
 export * from './feed.js';
 export * from './feed.query.js';
+export * from './health.js';
+export * from './health.query.js';
+export * from './run-job.js';
+export * from './run-job.query.js';
 export * from './ping.js';
 
 // No query options are generated for these methods:

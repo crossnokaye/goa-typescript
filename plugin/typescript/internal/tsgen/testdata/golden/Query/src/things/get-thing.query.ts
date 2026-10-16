@@ -10,19 +10,20 @@ import { getThing, GetThingPayload, getThingSpec } from './get-thing.js';
  * - Owner: server
  * - Source: `["things", id, { tags?, verbose?, since?, trace? }]`
  * - Writable: no
- * - Mutations & invalidation: `updateThingMutation`, `archiveThingMutation`
+ * - Mutations & invalidation: `updateThingMutation`, `deleteLabelMutation`, `archiveThingMutation`, `uploadContentMutation`
  * - Shares its path with `POST /things/{key}` (`legacy.fetchThingQuery`), `HEAD /things/{thing_id}` (`headThingQuery`), told apart by `$method`
  */
 export const getThingQuery = queryFor(getThing, getThingSpec, GetThingPayload, { required: true });
 
 /**
- * getThingKey returns the key of a getThing request, or without a payload the prefix
- * `["things"]` that every one of them starts with.
+ * getThingKey returns the key of a getThing request. Without a payload it returns
+ * `["things"]`, an invalidation prefix that other methods under the same path share:
+ * it is not a cache key.
  *
  * - Owner: server
  * - Source: `["things", id, { tags?, verbose?, since?, trace? }]`
  * - Writable: no
- * - Mutations & invalidation: `updateThingMutation`, `archiveThingMutation`
+ * - Mutations & invalidation: `updateThingMutation`, `deleteLabelMutation`, `archiveThingMutation`, `uploadContentMutation`
  * - Shares its path with `POST /things/{key}` (`legacy.fetchThingQuery`), `HEAD /things/{thing_id}` (`headThingQuery`), told apart by `$method`
  */
 export const getThingKey = keyFor(getThingSpec, GetThingPayload);

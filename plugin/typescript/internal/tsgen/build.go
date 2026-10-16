@@ -134,7 +134,7 @@ func Build(roots []*expr.RootExpr, opts Options) (*PackageSpec, error) {
 		pkg.Services = append(pkg.Services, spec)
 	}
 	if pkg.Query {
-		finishQueries(pkg.Services)
+		b.warnings = append(b.warnings, finishQueries(pkg.Services)...)
 	}
 	pkg.Warnings = b.warnings
 	return pkg, nil

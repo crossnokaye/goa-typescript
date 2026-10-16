@@ -26,7 +26,12 @@ export const TicksPayload = z.object({
 export type TicksResult = number;
 export const TicksResult = z.int() satisfies z.ZodType<TicksResult>;
 
-/** ticksSpec is the transport mapping of ticks. */
+/**
+ * ticksSpec is the transport mapping of ticks, for the sibling query file; it is not a
+ * public contract.
+ *
+ * @internal
+ */
 export const ticksSpec: EndpointSpec = {
   method: 'GET',
   path: '/things/{id}/ticks',

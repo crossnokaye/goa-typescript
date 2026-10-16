@@ -29,7 +29,12 @@ export const WatchThingPayload = z.object({
   delay_ms: z.int().optional(),
 }) satisfies z.ZodType<WatchThingPayload>;
 
-/** watchThingSpec is the transport mapping of watchThing. */
+/**
+ * watchThingSpec is the transport mapping of watchThing, for the sibling query file; it is not a
+ * public contract.
+ *
+ * @internal
+ */
 export const watchThingSpec: EndpointSpec = {
   method: 'GET',
   path: '/things/{id}/events',

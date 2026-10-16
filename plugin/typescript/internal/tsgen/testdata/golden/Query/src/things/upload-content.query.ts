@@ -8,16 +8,16 @@ import { uploadContent, UploadContentPayload, uploadContentSpec } from './upload
  * invalidation by hand.
  *
  * - Owner: server
- * - Invalidates: `["things", id, "content"]`
+ * - Invalidates: `["things", id]`
  */
-export const uploadContentInvalidates = invalidatesFor(uploadContentSpec, UploadContentPayload, ['/things/{id}/content'], { raw: true });
+export const uploadContentInvalidates = invalidatesFor(uploadContentSpec, UploadContentPayload, ['/things/{id}'], { raw: true });
 
 /**
  * uploadContentMutation returns the mutation options of uploadContent, for `useMutation`. Given
- * `{ queryClient }`, `onSuccess` invalidates the keys below.
+ * `{ queryClient }`, `onSuccess` invalidates the keys below (never a stream's).
  * The variables are `{ payload, body }`.
  *
  * - Owner: server
- * - Invalidates: `["things", id, "content"]`
+ * - Invalidates: `["things", id]`
  */
 export const uploadContentMutation = mutationFor(uploadContent, uploadContentInvalidates, { raw: true });

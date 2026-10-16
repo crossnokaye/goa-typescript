@@ -11,6 +11,8 @@ import {
   keyFor,
   keyPrefixFor,
   mutationFor,
+  type InvalidateFilters,
+  isStreamKey,
   type QueryKey,
   queryFor,
   queryKeyFor,
@@ -122,20 +124,48 @@ describe('queryKeyFor', () => {
     expect(queryKeyFor(scalar, 'x', { discriminator: 'method' })).toEqual(['things', { $method: 'POST', $value: 'x' }]);
   });
 
-  it('marks the stream of a mixed method with $stream', () => {
+  it('marks a stream key with $stream first, then $method', () => {
     const feed = spec({ path: '/feed', queryParams: { kind: 'kind' } });
-    const key = queryKeyFor(feed, { kind: 'a' }, { discriminator: 'stream' });
+    const key = queryKeyFor(feed, { kind: 'a' }, { stream: true });
     expect(key).toEqual(['feed', { $stream: true, kind: 'a' }]);
     expect(Object.keys(key[1] as object)[0]).toBe('$stream');
-    expect(queryKeyFor(feed, {}, { discriminator: 'stream' })).toEqual(['feed', { $stream: true }]);
+    expect(queryKeyFor(feed, {}, { stream: true })).toEqual(['feed', { $stream: true }]);
+    const post = spec({ method: 'POST', path: '/feed', body: { kind: 'fields', fields: ['kind'] } });
+    const both = queryKeyFor(post, { kind: 'a' }, { stream: true, discriminator: 'method' });
+    expect(both).toEqual(['feed', { $stream: true, $method: 'POST', kind: 'a' }]);
+    expect(Object.keys(both[1] as object)).toEqual(['$stream', '$method', 'kind']);
+  });
+
+  it('tells stream keys apart', () => {
+    expect(isStreamKey(['things', 'a', { $stream: true }])).toBe(true);
+    expect(isStreamKey(['things', 'a', { $stream: true, delay: 5 }])).toBe(true);
+    expect(isStreamKey(['things', 'a'])).toBe(false);
+    expect(isStreamKey(['things', { $method: 'HEAD' }])).toBe(false);
+    expect(isStreamKey(['things', { $stream: 'yes' }])).toBe(false);
+    expect(isStreamKey([])).toBe(false);
   });
 });
 
 describe('keyPrefixFor and keyFor', () => {
   it('returns the static segments up to the first parameter', () => {
     expect(keyPrefixFor(getThingSpec)).toEqual(['api', 'things']);
-    expect(keyPrefixFor(spec({ path: '/' }))).toEqual([]);
     expect(keyPrefixFor(spec({ path: '/a/b/c' }))).toEqual(['a', 'b', 'c']);
+  });
+
+  it('never returns an empty prefix for a route that starts with a parameter', () => {
+    const top = spec({ path: '/{id}/items', pathParams: { id: 'id' } });
+    expect(keyPrefixFor(top)).toEqual([null, 'items']);
+    expect(keyFor(top, z.object({ id: z.string() }))()).toEqual([null, 'items']);
+  });
+
+  it('appends the markers to the prefix of a route without parameters, so it is no other exact key', () => {
+    const feed = spec({ path: '/feed', queryParams: { kind: 'kind' } });
+    const Feed = z.object({ kind: z.string().optional() });
+    expect(keyFor(feed, Feed)()).toEqual(['feed']);
+    expect(keyFor(feed, Feed, { stream: true })()).toEqual(['feed', { $stream: true }]);
+    expect(keyFor({ ...feed, method: 'HEAD' }, Feed, { discriminator: 'method' })()).toEqual(['feed', { $method: 'HEAD' }]);
+    // A route with parameters keeps the bare static prefix, which is no request's key.
+    expect(keyFor(getThingSpec, GetThingPayload, { stream: true })()).toEqual(['api', 'things']);
   });
 
   it('returns the full key for a payload, encoded, and the prefix without one', () => {
@@ -245,6 +275,29 @@ describe('queryFor', () => {
     expect(noneQuery(client).queryKey).toEqual(['ping']);
   });
 
+  it('resolves a void read to null, after the call', async () => {
+    let called = false;
+    const ping = async (_c: Client, _p?: undefined): Promise<CallResult<void, never>> => {
+      called = true;
+      return ok(undefined);
+    };
+    const pingQuery = queryFor(ping, spec({ path: '/ping' }), null, { void: true });
+    const options = pingQuery(client);
+    expectTypeOf(options.queryFn).returns.toEqualTypeOf<Promise<null>>();
+    await expect(options.queryFn({ signal: new AbortController().signal })).resolves.toBeNull();
+    expect(called).toBe(true);
+    const fail = queryFor(
+      async (_c: Client, _p?: undefined): Promise<CallResult<void, RequestValidationError>> => ({
+        ok: false,
+        error: new RequestValidationError([]),
+      }),
+      spec({ path: '/ping' }),
+      null,
+      { void: true },
+    );
+    await expect(fail(client).queryFn({ signal: new AbortController().signal })).rejects.toBeInstanceOf(RequestValidationError);
+  });
+
   it('discriminates the key when asked', () => {
     const headQuery = queryFor(async () => ok(1), { ...getThingSpec, method: 'HEAD' }, GetThingPayload, {
       required: true,
@@ -290,7 +343,7 @@ describe('streamFor', () => {
     const { received, streamedQuery } = fake();
     const reducer = (acc: number, e: Event) => acc + e.n;
     const options = watchQuery(client, { id: 'a', delay: 5 }, { streamedQuery, refetchMode: 'append', reducer, initialValue: 0 });
-    expect(options.queryKey).toEqual(['things', 'a', 'events', { delay: 5 }]);
+    expect(options.queryKey).toEqual(['things', 'a', 'events', { $stream: true, delay: 5 }]);
     expect(options.staleTime).toBe(Infinity);
     expect(options.enabled).toBeUndefined();
     expect(received).toHaveLength(1);
@@ -339,7 +392,7 @@ describe('streamFor', () => {
     const options = watchQuery(client, undefined, { streamedQuery });
     expect(options.enabled).toBe(false);
     expect(options.staleTime).toBe(Infinity);
-    expect(options.queryKey).toEqual(['things', null, 'events', { $disabled: true }]);
+    expect(options.queryKey).toEqual(['things', null, 'events', { $stream: true, $disabled: true }]);
     await expect(received[0]!.streamFn({ signal: new AbortController().signal })).rejects.toThrow(
       'query disabled: payload is undefined',
     );
@@ -356,10 +409,13 @@ describe('invalidatesFor and mutationFor', () => {
 
   function fakeQueryClient() {
     const invalidated: QueryKey[] = [];
+    const predicates: ((query: { queryKey: QueryKey }) => boolean)[] = [];
     return {
       invalidated,
-      invalidateQueries: async (filters: { queryKey: QueryKey }) => {
+      predicates,
+      invalidateQueries: async (filters: InvalidateFilters) => {
         invalidated.push(filters.queryKey);
+        if (filters.predicate) predicates.push(filters.predicate);
       },
     };
   }
@@ -379,6 +435,27 @@ describe('invalidatesFor and mutationFor', () => {
     await expect(options.mutationFn({ id: 'a', label: 'l' })).resolves.toBe('l');
     await options.onSuccess!('l', { id: 'a', label: 'l' });
     expect(qc.invalidated).toEqual([['things', 'a', 'labels'], ['things']]);
+  });
+
+  it('never invalidates a stream key', async () => {
+    const invalidates = invalidatesFor(labelSpec, Label, ['/things']);
+    const qc = fakeQueryClient();
+    const options = mutationFor(async (_c: Client, _p: z.output<typeof Label>) => ok(1), invalidates)(client, {
+      queryClient: qc,
+    });
+    await options.onSuccess!(1, { id: 'a', label: 'l' });
+    expect(qc.predicates).toHaveLength(1);
+    const keep = qc.predicates[0]!;
+    expect(keep({ queryKey: ['things', 'a', { verbose: true }] })).toBe(true);
+    expect(keep({ queryKey: ['things'] })).toBe(true);
+    expect(keep({ queryKey: ['things', 'a', 'events', { $stream: true }] })).toBe(false);
+  });
+
+  it('drops a key that would be empty', () => {
+    const top = spec({ method: 'DELETE', path: '/{id}', pathParams: { id: 'id' } });
+    const invalidates = invalidatesFor(top, z.object({ id: z.string() }), ['/{id}']);
+    expect(invalidates({ id: 'a' })).toEqual([['a']]);
+    expect(invalidates()).toEqual([]);
   });
 
   it('omits onSuccess without a queryClient', () => {

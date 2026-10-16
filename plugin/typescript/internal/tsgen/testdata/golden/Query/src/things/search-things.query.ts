@@ -15,8 +15,9 @@ import { searchThings, SearchThingsPayload, searchThingsSpec } from './search-th
 export const searchThingsQuery = queryFor(searchThings, searchThingsSpec, SearchThingsPayload, { required: true });
 
 /**
- * searchThingsKey returns the key of a searchThings request, or without a payload the prefix
- * `["things", "search"]` that every one of them starts with.
+ * searchThingsKey returns the key of a searchThings request. Without a payload it returns
+ * `["things", "search"]`, an invalidation prefix that matches every searchThings request and is no other
+ * query's key.
  *
  * - Owner: server
  * - Source: `["things", "search", { text, kinds? }]`

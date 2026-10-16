@@ -27,7 +27,12 @@ export const FetchThingPayload = z.object({
   fields: z.array(z.string()).optional(),
 }) satisfies z.ZodType<FetchThingPayload>;
 
-/** fetchThingSpec is the transport mapping of fetchThing. */
+/**
+ * fetchThingSpec is the transport mapping of fetchThing, for the sibling query file; it is not a
+ * public contract.
+ *
+ * @internal
+ */
 export const fetchThingSpec: EndpointSpec = {
   method: 'POST',
   path: '/things/{key}',

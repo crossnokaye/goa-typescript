@@ -1,10 +1,10 @@
 {{ .ImportBlock }}
 {{- template "partial_endpoint_types" . }}
 
-{{ if .ExportSpec }}{{ jsdoc (printf "%s is the transport mapping of %s." .SpecName .FuncName) "" }}export {{ end }}const {{ .SpecName }}: EndpointSpec = {{ .SpecTS }};
+{{ if .ExportSpec }}{{ jsdoc (printf "%s is the transport mapping of %s, for the sibling query file; it is not a\npublic contract.\n\n@internal" .SpecName .FuncName) "" }}export {{ end }}const {{ .SpecName }}: EndpointSpec = {{ .SpecTS }};
 {{- with .Stream }}
 
-{{ if $.ExportSpec }}{{ jsdoc (printf "%s is the transport mapping of %s." .SpecName .FuncName) "" }}export {{ end }}const {{ .SpecName }}: EndpointSpec = {{ .SpecTS }};
+{{ if $.ExportSpec }}{{ jsdoc (printf "%s is the transport mapping of %s, for the sibling query file; it is not a\npublic contract.\n\n@internal" .SpecName .FuncName) "" }}export {{ end }}const {{ .SpecName }}: EndpointSpec = {{ .SpecTS }};
 {{- end }}
 
 const {{ .ResponsesName }} = {{ .ResponsesTS }};

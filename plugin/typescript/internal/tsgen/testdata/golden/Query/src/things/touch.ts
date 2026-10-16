@@ -13,7 +13,12 @@ import {
   send,
 } from '../runtime/index.js';
 
-/** touchSpec is the transport mapping of touch. */
+/**
+ * touchSpec is the transport mapping of touch, for the sibling query file; it is not a
+ * public contract.
+ *
+ * @internal
+ */
 export const touchSpec: EndpointSpec = {
   method: 'POST',
   path: '/touch',

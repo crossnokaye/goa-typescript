@@ -14,7 +14,7 @@ export const touchInvalidates = invalidatesFor(touchSpec, null, []);
 
 /**
  * touchMutation returns the mutation options of touch, for `useMutation`. Given
- * `{ queryClient }`, `onSuccess` invalidates the keys below.
+ * `{ queryClient }`, `onSuccess` invalidates the keys below (never a stream's).
  *
  * - Owner: server
  * - Invalidates: nothing

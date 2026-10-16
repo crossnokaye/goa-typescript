@@ -34,7 +34,12 @@ export const GetThingPayload = z.object({
   trace: z.string().optional(),
 }) satisfies z.ZodType<GetThingPayload>;
 
-/** getThingSpec is the transport mapping of getThing. */
+/**
+ * getThingSpec is the transport mapping of getThing, for the sibling query file; it is not a
+ * public contract.
+ *
+ * @internal
+ */
 export const getThingSpec: EndpointSpec = {
   method: 'GET',
   path: '/things/{id}',

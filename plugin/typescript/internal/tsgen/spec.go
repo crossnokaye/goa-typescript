@@ -236,17 +236,22 @@ type QuerySpec struct {
 	KeyName string
 	// InvalidatesName is xyzInvalidates (mutations).
 	InvalidatesName string
-	// Discriminator tells the key apart from another query's on the same
-	// route: "method" puts $method in it, "stream" (the stream of a mixed
-	// method) puts $stream; "" for a clean key.
+	// Discriminator is "method" when the key carries $method because another
+	// query of the same kind shares its route; "" for a clean key. A stream's
+	// key always carries $stream besides.
 	Discriminator string
-	// OtherMarks are the discriminators the colliding queries carry, e.g.
-	// "`$method`", for the state card of a clean key.
-	OtherMarks []string
 	// Collisions describe the queries that share the path, as `VERB /path` (`name`).
 	Collisions []string
 	// Invalidates are the path templates of the keys a mutation invalidates.
 	Invalidates []string
+	// InvalidatesNoQuery is true when the default invalidation reaches no
+	// read: `goa gen` warns about it.
+	InvalidatesNoQuery bool `json:",omitempty"`
+	// defaultInvalidation is true when the mutation declares no
+	// Meta("typescript:invalidates"): finishQueries computes Invalidates.
+	defaultInvalidation bool
+	// Void is true for a read whose method has no result: its data is null.
+	Void bool `json:",omitempty"`
 	// InvalidatedBy are the mutations whose invalidation matches this key.
 	InvalidatedBy []string
 	// Source is the shape of the key, for the state card.

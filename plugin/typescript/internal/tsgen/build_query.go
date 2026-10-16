@@ -123,6 +123,9 @@ func classifyQuery(e *expr.HTTPEndpointExpr, ep *EndpointSpec, svc *ServiceSpec)
 		} else {
 			q := add(kind, ep.FuncName, ep.SpecName)
 			q.Raw = ep.RawBody
+			// TanStack Query treats undefined data as an error: a read of a
+			// method without a result resolves to null.
+			q.Void = kind == QueryRead && (ep.Result == nil || ep.Result.TypeName == "")
 		}
 		if ep.Stream != nil {
 			add(QueryStream, ep.Stream.FuncName, ep.Stream.SpecName)
@@ -163,7 +166,9 @@ func checkInvalidatesMeta(m *expr.MethodExpr, mutation bool) error {
 }
 
 // nameQueries names the query exports of a service, once every function of
-// the service has its name, and resolves the invalidation of its mutations.
+// the service has its name, and resolves the invalidation its mutations
+// declare with Meta("typescript:invalidates"). The default invalidation needs
+// every read of every service: finishQueries computes it.
 func nameQueries(svc *ServiceSpec, methods map[string]*expr.MethodExpr, names *codegen.NameScope) error {
 	// The query and stream functions of the service, by method name.
 	reads := make(map[string][]*QuerySpec)
@@ -187,7 +192,7 @@ func nameQueries(svc *ServiceSpec, methods map[string]*expr.MethodExpr, names *c
 			}
 			v, ok := methods[ep.MethodName].Meta.Last(metaInvalidates)
 			if !ok {
-				q.Invalidates = []string{defaultInvalidation(q.Path)}
+				q.defaultInvalidation = true
 				continue
 			}
 			for _, name := range strings.Split(v, ",") {
@@ -206,6 +211,10 @@ func nameQueries(svc *ServiceSpec, methods map[string]*expr.MethodExpr, names *c
 				}
 				for _, t := range targets {
 					prefix := staticPrefix(t.Path)
+					if prefix == "/" {
+						return fmt.Errorf("method %q: Meta(%q) cannot invalidate %q: its route has no static prefix",
+							ep.MethodName, metaInvalidates, name)
+					}
 					if !slices.Contains(q.Invalidates, prefix) {
 						q.Invalidates = append(q.Invalidates, prefix)
 					}
@@ -232,18 +241,37 @@ func segments(path string) []string {
 
 func isParam(segment string) bool { return strings.Contains(segment, "{") }
 
-// defaultInvalidation is the path whose key a mutation invalidates: its own,
-// trailing parameters stripped.
-func defaultInvalidation(path string) string {
+// defaultInvalidation is the path whose key a mutation invalidates by
+// default: its own route with trailing parameters stripped, then shortened
+// one segment at a time until it is a prefix of the route of at least one of
+// reads, and never below one segment. ok is false when no such prefix
+// reaches a read: the path is then the shortest one tried, and "" when the
+// route has no segment at all.
+func defaultInvalidation(path string, reads []string) (template string, ok bool) {
 	segs := segments(path)
-	for len(segs) > 0 && isParam(segs[len(segs)-1]) {
+	for len(segs) > 1 && isParam(segs[len(segs)-1]) {
 		segs = segs[:len(segs)-1]
 	}
-	return "/" + strings.Join(segs, "/")
+	if len(segs) == 0 {
+		return "", false
+	}
+	for {
+		template = "/" + strings.Join(segs, "/")
+		for _, r := range reads {
+			if invalidates(template, r) {
+				return template, true
+			}
+		}
+		if len(segs) == 1 {
+			return template, false
+		}
+		segs = segs[:len(segs)-1]
+	}
 }
 
 // staticPrefix is the path made of the static segments of a route up to its
-// first parameter: what keyPrefixFor returns.
+// first parameter: what keyPrefixFor returns. It is "/" when the route
+// starts with a parameter.
 func staticPrefix(path string) string {
 	var out []string
 	for _, s := range segments(path) {
@@ -268,17 +296,26 @@ type queryRef struct {
 	q   *QuerySpec
 }
 
-// finishQueries runs once every service is built: it detects key collisions
-// across services, finds which mutations invalidate which keys, and renders
-// the query files' declarations.
-func finishQueries(services []*ServiceSpec) {
-	var reads, writes []queryRef
+// finishQueries runs once every service is built: it resolves the default
+// invalidation of mutations, detects key collisions across services, finds
+// which mutations invalidate which keys, and renders the query files'
+// declarations. It returns warnings for `goa gen` to print.
+func finishQueries(services []*ServiceSpec) []string {
+	var (
+		reads, writes []queryRef
+		readPaths     []string
+		warnings      []string
+	)
 	for _, svc := range services {
 		for _, ep := range svc.Endpoints {
 			for _, q := range ep.Queries {
-				if q.Kind == QueryMutation {
+				switch q.Kind {
+				case QueryMutation:
 					writes = append(writes, queryRef{svc, ep, q})
-				} else {
+				case QueryRead:
+					readPaths = append(readPaths, q.Path)
+					fallthrough
+				default:
 					reads = append(reads, queryRef{svc, ep, q})
 				}
 			}
@@ -291,11 +328,31 @@ func finishQueries(services []*ServiceSpec) {
 		return name
 	}
 
-	// Collisions: equal routes once parameter names are ignored.
+	// Default invalidation: the nearest ancestor of the mutation's route
+	// that some read lives under. Streams do not count: mutations never
+	// invalidate them.
+	for _, w := range writes {
+		if !w.q.defaultInvalidation {
+			continue
+		}
+		template, ok := defaultInvalidation(w.q.Path, readPaths)
+		if template != "" {
+			w.q.Invalidates = []string{template}
+		}
+		if !ok {
+			w.q.InvalidatesNoQuery = true
+			warnings = append(warnings, fmt.Sprintf("service %q: mutation %q invalidates no query", w.svc.Name, w.ep.MethodName))
+		}
+	}
+
+	// Collisions: reads with reads and streams with streams, on routes that
+	// are equal once parameter names are ignored. A GET keeps its clean key;
+	// every other member is told apart by its verb, so when no member is a
+	// GET all of them are.
 	groups := make(map[string][]queryRef)
 	var order []string
 	for _, r := range reads {
-		k := normalizedPath(r.q.Path)
+		k := string(r.q.Kind) + " " + normalizedPath(r.q.Path)
 		if _, ok := groups[k]; !ok {
 			order = append(order, k)
 		}
@@ -306,32 +363,9 @@ func finishQueries(services []*ServiceSpec) {
 		if len(group) < 2 {
 			continue
 		}
-		gets := 0
 		for _, r := range group {
-			if r.q.Verb == "GET" {
-				gets++
-			}
-		}
-		for _, r := range group {
-			// A GET read keeps its clean key; everything else that shares
-			// the route is told apart by its verb. Two GETs on one route
-			// are the plain function and the stream of a mixed method: the
-			// stream is the one discriminated, as a stream.
-			switch {
-			case r.q.Verb != "GET":
+			if r.q.Verb != "GET" {
 				r.q.Discriminator = "method"
-			case r.q.Kind == QueryStream && gets > 1:
-				r.q.Discriminator = "stream"
-			}
-		}
-		for _, r := range group {
-			for _, o := range group {
-				if o.q != r.q && o.q.Discriminator != "" {
-					mark := "`" + discriminatorMark(o.q) + "`"
-					if !slices.Contains(r.q.OtherMarks, mark) {
-						r.q.OtherMarks = append(r.q.OtherMarks, mark)
-					}
-				}
 			}
 			for _, o := range group {
 				if o.q != r.q {
@@ -342,9 +376,12 @@ func finishQueries(services []*ServiceSpec) {
 		}
 	}
 
-	// Invalidation: a mutation's template invalidates every key it is a
+	// Invalidation: a mutation's template invalidates every read key it is a
 	// prefix of.
 	for _, r := range reads {
+		if r.q.Kind != QueryRead {
+			continue
+		}
 		for _, w := range writes {
 			for _, t := range w.q.Invalidates {
 				if invalidates(t, r.q.Path) {
@@ -371,23 +408,7 @@ func finishQueries(services []*ServiceSpec) {
 			sort.Strings(ep.QueryImports)
 		}
 	}
-}
-
-// discriminatorMark names the property a discriminated key carries.
-func discriminatorMark(q *QuerySpec) string {
-	if q.Discriminator == "stream" {
-		return "$stream"
-	}
-	return "$method"
-}
-
-// discriminatorEntry renders the discriminator as it sits in the key, for
-// the state card.
-func discriminatorEntry(q *QuerySpec) string {
-	if q.Discriminator == "stream" {
-		return "$stream: true"
-	}
-	return `$method: "` + q.Verb + `"`
+	return warnings
 }
 
 // invalidates reports whether the key prefix of a template matches the keys
@@ -406,36 +427,53 @@ func invalidates(template, path string) bool {
 	return true
 }
 
-// keySource renders the shape of a function's key for its state card, e.g.
-// `["things", id, { tags?, verbose? }]`.
-func keySource(ep *EndpointSpec, q *QuerySpec) string {
-	req := ep.Request
+// pathKeyParts renders the segments of a key for a state card: static
+// segments quoted, a parameter by the request property holding it, or, when
+// none does, by missing (or by the parameter's own name when missing is "").
+func pathKeyParts(ep *EndpointSpec, path, missing string) []string {
 	paramProp := make(map[string]string)
-	if req != nil {
-		for _, p := range req.Path {
+	if ep.Request != nil {
+		for _, p := range ep.Request.Path {
 			paramProp[p.Wire] = p.Prop
 		}
 	}
 	var parts []string
-	for _, s := range segments(q.Path) {
+	for _, s := range segments(path) {
 		if m := pathParam.FindStringSubmatch(s); m != nil && m[0] == s {
 			name := paramProp[m[1]]
-			if name == "" {
-				name = "payload"
+			switch {
+			case name != "":
+			case missing != "":
+				name = missing
+			default:
+				name = m[1]
 			}
 			parts = append(parts, name)
 			continue
 		}
 		parts = append(parts, `"`+s+`"`)
 	}
+	return parts
+}
+
+// keySource renders the shape of a function's key for its state card, e.g.
+// `["things", id, { tags?, verbose? }]`. It follows the key grammar of ADR
+// 0006, which runtime/src/query.ts implements (queryKeyFor): the two must
+// agree.
+func keySource(ep *EndpointSpec, q *QuerySpec) string {
+	req := ep.Request
+	parts := pathKeyParts(ep, q.Path, "payload")
 	var inputs []string
+	if q.Kind == QueryStream {
+		inputs = append(inputs, "$stream: true")
+	}
 	if q.Discriminator != "" {
 		inputs = append(inputs, discriminatorEntry(q))
 	}
 	if req != nil {
 		if req.Scalar {
 			if len(req.Path) == 0 {
-				if q.Discriminator != "" {
+				if len(inputs) > 0 {
 					inputs = append(inputs, "$value: payload")
 				} else {
 					parts = append(parts, "payload")
@@ -486,28 +524,28 @@ func keySource(ep *EndpointSpec, q *QuerySpec) string {
 	return "[" + strings.Join(parts, ", ") + "]"
 }
 
+// discriminatorEntry renders the discriminator as it sits in the key.
+func discriminatorEntry(q *QuerySpec) string {
+	return `$method: "` + q.Verb + `"`
+}
+
 // templateKey renders the key a path template invalidates, e.g.
 // `["things", id, "labels"]`.
 func templateKey(ep *EndpointSpec, template string) string {
-	paramProp := make(map[string]string)
-	if ep.Request != nil {
-		for _, p := range ep.Request.Path {
-			paramProp[p.Wire] = p.Prop
-		}
+	return "[" + strings.Join(pathKeyParts(ep, template, ""), ", ") + "]"
+}
+
+// keyFlags renders the flags a key takes: the stream marker and the
+// discriminator.
+func keyFlags(q *QuerySpec) []string {
+	var flags []string
+	if q.Kind == QueryStream {
+		flags = append(flags, "stream: true")
 	}
-	var parts []string
-	for _, s := range segments(template) {
-		if m := pathParam.FindStringSubmatch(s); m != nil && m[0] == s {
-			name := paramProp[m[1]]
-			if name == "" {
-				name = m[1]
-			}
-			parts = append(parts, name)
-			continue
-		}
-		parts = append(parts, `"`+s+`"`)
+	if q.Discriminator != "" {
+		flags = append(flags, "discriminator: "+tsString(q.Discriminator))
 	}
-	return "[" + strings.Join(parts, ", ") + "]"
+	return flags
 }
 
 // queryDecls renders the exports of one function: the JSDoc state card and
@@ -522,7 +560,11 @@ func queryDecls(ep *EndpointSpec, q *QuerySpec, runtime map[string]struct{}) []Q
 		flags = append(flags, "required: true")
 	}
 	if q.Discriminator != "" {
+		// A stream is marked by streamFor itself.
 		flags = append(flags, "discriminator: "+tsString(q.Discriminator))
+	}
+	if q.Void {
+		flags = append(flags, "void: true")
 	}
 	literal := func(fields []string) string {
 		if len(fields) == 0 {
@@ -539,7 +581,10 @@ func queryDecls(ep *EndpointSpec, q *QuerySpec, runtime map[string]struct{}) []Q
 		line("- Source: `%s`", q.Source)
 		line("- Writable: no")
 		by := "none"
-		if len(q.InvalidatedBy) > 0 {
+		switch {
+		case q.Kind == QueryStream:
+			by = "none (mutations never invalidate streams)"
+		case len(q.InvalidatedBy) > 0:
 			by = strings.Join(q.InvalidatedBy, ", ")
 		}
 		line("- Mutations & invalidation: %s", by)
@@ -547,8 +592,7 @@ func queryDecls(ep *EndpointSpec, q *QuerySpec, runtime map[string]struct{}) []Q
 			if q.Discriminator != "" {
 				line("- Collides with %s: the key carries `%s`", strings.Join(q.Collisions, ", "), discriminatorEntry(q))
 			} else {
-				line("- Shares its path with %s, told apart by %s", strings.Join(q.Collisions, ", "),
-					strings.Join(q.OtherMarks, " and "))
+				line("- Shares its path with %s, told apart by `$method`", strings.Join(q.Collisions, ", "))
 			}
 		}
 	case QueryMutation:
@@ -557,10 +601,14 @@ func queryDecls(ep *EndpointSpec, q *QuerySpec, runtime map[string]struct{}) []Q
 		for _, t := range q.Invalidates {
 			keys = append(keys, "`"+templateKey(ep, t)+"`")
 		}
-		if len(keys) == 0 {
-			keys = []string{"nothing"}
+		invalidated := strings.Join(keys, ", ")
+		switch {
+		case len(keys) == 0:
+			invalidated = "nothing"
+		case q.InvalidatesNoQuery:
+			invalidated += " (no query lives under it)"
 		}
-		line("- Invalidates: %s", strings.Join(keys, ", "))
+		line("- Invalidates: %s", invalidated)
 	}
 	stateCard := card.String()
 
@@ -572,12 +620,15 @@ func queryDecls(ep *EndpointSpec, q *QuerySpec, runtime map[string]struct{}) []Q
 		if q.Required {
 			doc += "\nA payload of `undefined` returns a disabled query (`enabled: false`)."
 		}
+		if q.Void {
+			doc += "\nThe method has no result: the data is `null`."
+		}
 		decls = append(decls,
 			QueryDecl{
 				Doc:  doc + "\n" + stateCard,
 				Code: fmt.Sprintf("export const %s = queryFor(%s, %s, %s, %s);", q.Name, q.FuncName, q.SpecName, schema, literal(flags)),
 			},
-			keyDecl(q, schema, stateCard))
+			keyDecl(q, schema, stateCard, literal))
 	case QueryStream:
 		runtime["streamFor"], runtime["keyFor"] = struct{}{}, struct{}{}
 		doc := fmt.Sprintf("%s returns the streamed query options of %s. Pass TanStack's\n", q.Name, q.FuncName) +
@@ -591,20 +642,16 @@ func queryDecls(ep *EndpointSpec, q *QuerySpec, runtime map[string]struct{}) []Q
 				Doc:  doc + "\n" + stateCard,
 				Code: fmt.Sprintf("export const %s = streamFor(%s, %s, %s, %s);", q.Name, q.FuncName, q.SpecName, schema, literal(flags)),
 			},
-			keyDecl(q, schema, stateCard))
+			keyDecl(q, schema, stateCard, literal))
 	case QueryMutation:
 		runtime["invalidatesFor"], runtime["mutationFor"] = struct{}{}, struct{}{}
 		templates := make([]string, len(q.Invalidates))
 		for i, t := range q.Invalidates {
 			templates[i] = tsString(t)
 		}
-		raw := ""
+		raw, vars := "", ""
 		if q.Raw {
-			raw = ", { raw: true }"
-		}
-		vars := ""
-		if q.Raw {
-			vars = "\nThe variables are `{ payload, body }`."
+			raw, vars = ", { raw: true }", "\nThe variables are `{ payload, body }`."
 		}
 		decls = append(decls,
 			QueryDecl{
@@ -615,22 +662,54 @@ func queryDecls(ep *EndpointSpec, q *QuerySpec, runtime map[string]struct{}) []Q
 			},
 			QueryDecl{
 				Doc: fmt.Sprintf("%s returns the mutation options of %s, for `useMutation`. Given\n", q.Name, q.FuncName) +
-					"`{ queryClient }`, `onSuccess` invalidates the keys below." + vars + "\n" + stateCard,
+					"`{ queryClient }`, `onSuccess` invalidates the keys below (never a stream's)." + vars + "\n" + stateCard,
 				Code: fmt.Sprintf("export const %s = mutationFor(%s, %s%s);", q.Name, q.FuncName, q.InvalidatesName, raw),
 			})
 	}
 	return decls
 }
 
+// prefixKeyText renders what xyzKey() returns without a payload, as
+// keyFor does: the static prefix, the route with null parameters when it
+// starts with one, and for a route without parameters the key's markers.
+func prefixKeyText(q *QuerySpec) string {
+	if staticPrefix(q.Path) == "/" {
+		return "[" + strings.Join(pathKeyParts(&EndpointSpec{}, q.Path, "null"), ", ") + "]"
+	}
+	parts := pathKeyParts(&EndpointSpec{}, staticPrefix(q.Path), "")
+	if !strings.Contains(q.Path, "{") {
+		var marks []string
+		if q.Kind == QueryStream {
+			marks = append(marks, "$stream: true")
+		}
+		if q.Discriminator != "" {
+			marks = append(marks, discriminatorEntry(q))
+		}
+		if len(marks) > 0 {
+			parts = append(parts, "{ "+strings.Join(marks, ", ")+" }")
+		}
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
+}
+
 // keyDecl renders xyzKey.
-func keyDecl(q *QuerySpec, schema, stateCard string) QueryDecl {
+func keyDecl(q *QuerySpec, schema, stateCard string, literal func([]string) string) QueryDecl {
 	args := q.SpecName + ", " + schema
-	if q.Discriminator != "" {
-		args += ", { discriminator: " + tsString(q.Discriminator) + " }"
+	if flags := keyFlags(q); len(flags) > 0 {
+		args += ", " + literal(flags)
+	}
+	var doc string
+	if strings.Contains(q.Path, "{") {
+		doc = fmt.Sprintf("%s returns the key of a %s request. Without a payload it returns\n", q.KeyName, q.FuncName) +
+			fmt.Sprintf("`%s`, an invalidation prefix that other methods under the same path share:\n", prefixKeyText(q)) +
+			"it is not a cache key."
+	} else {
+		doc = fmt.Sprintf("%s returns the key of a %s request. Without a payload it returns\n", q.KeyName, q.FuncName) +
+			fmt.Sprintf("`%s`, an invalidation prefix that matches every %s request and is no other\n", prefixKeyText(q), q.FuncName) +
+			"query's key."
 	}
 	return QueryDecl{
-		Doc: fmt.Sprintf("%s returns the key of a %s request, or without a payload the prefix\n", q.KeyName, q.FuncName) +
-			fmt.Sprintf("`%s` that every one of them starts with.\n", templateKey(&EndpointSpec{}, staticPrefix(q.Path))) + stateCard,
+		Doc:  doc + "\n" + stateCard,
 		Code: fmt.Sprintf("export const %s = keyFor(%s);", q.KeyName, args),
 	}
 }

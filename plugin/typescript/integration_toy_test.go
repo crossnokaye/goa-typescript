@@ -69,6 +69,7 @@ func TestToyExample_GenerateAndRun(t *testing.T) {
 		"gen/ts/src/toy/create-thing.query.ts",
 		"gen/ts/src/toy/stream-things-sse.query.ts",
 		"gen/ts/src/toy/watch-ticks.query.ts",
+		"gen/ts/src/toy/ping.query.ts",
 		"gen/ts/src/toy/get-thing-viewed.ts",
 		"gen/ts/src/toy/list-things.ts",
 		"gen/ts/src/toy/create-thing.ts",

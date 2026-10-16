@@ -10,19 +10,20 @@ import { ticks, TicksPayload, ticksSpec } from './ticks.js';
  * A payload of `undefined` returns a disabled query (`enabled: false`).
  *
  * - Owner: server
- * - Source: `["things", id, "ticks"]`
+ * - Source: `["things", id, "ticks", { $stream: true }]`
  * - Writable: no
- * - Mutations & invalidation: `updateThingMutation`, `archiveThingMutation`
+ * - Mutations & invalidation: none (mutations never invalidate streams)
  */
 export const ticksQuery = streamFor(ticks, ticksSpec, TicksPayload, { required: true });
 
 /**
- * ticksKey returns the key of a ticks request, or without a payload the prefix
- * `["things"]` that every one of them starts with.
+ * ticksKey returns the key of a ticks request. Without a payload it returns
+ * `["things"]`, an invalidation prefix that other methods under the same path share:
+ * it is not a cache key.
  *
  * - Owner: server
- * - Source: `["things", id, "ticks"]`
+ * - Source: `["things", id, "ticks", { $stream: true }]`
  * - Writable: no
- * - Mutations & invalidation: `updateThingMutation`, `archiveThingMutation`
+ * - Mutations & invalidation: none (mutations never invalidate streams)
  */
-export const ticksKey = keyFor(ticksSpec, TicksPayload);
+export const ticksKey = keyFor(ticksSpec, TicksPayload, { stream: true });

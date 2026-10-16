@@ -11,7 +11,7 @@ import { getThing, GetThingPayload, getThingSpec } from './get-thing.js';
  * - Source: `["things", id, { tags?, verbose?, since?, trace? }]`
  * - Writable: no
  * - Mutations & invalidation: `updateThingMutation`, `archiveThingMutation`
- * - Shares its path with `POST /things/{key}` (`legacy.fetchThingQuery`), `HEAD /things/{thing_id}` (`headThingQuery`), whose key carries `$method`
+ * - Shares its path with `POST /things/{key}` (`legacy.fetchThingQuery`), `HEAD /things/{thing_id}` (`headThingQuery`), told apart by `$method`
  */
 export const getThingQuery = queryFor(getThing, getThingSpec, GetThingPayload, { required: true });
 
@@ -23,6 +23,6 @@ export const getThingQuery = queryFor(getThing, getThingSpec, GetThingPayload, {
  * - Source: `["things", id, { tags?, verbose?, since?, trace? }]`
  * - Writable: no
  * - Mutations & invalidation: `updateThingMutation`, `archiveThingMutation`
- * - Shares its path with `POST /things/{key}` (`legacy.fetchThingQuery`), `HEAD /things/{thing_id}` (`headThingQuery`), whose key carries `$method`
+ * - Shares its path with `POST /things/{key}` (`legacy.fetchThingQuery`), `HEAD /things/{thing_id}` (`headThingQuery`), told apart by `$method`
  */
 export const getThingKey = keyFor(getThingSpec, GetThingPayload);

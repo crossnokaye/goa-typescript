@@ -114,12 +114,20 @@ describe('queryKeyFor', () => {
 
   it('puts the discriminator first in the trailing object, creating it when needed', () => {
     const head = spec({ method: 'HEAD', path: '/things/{id}', pathParams: { id: 'id' }, queryParams: { v: 'v' } });
-    const key = queryKeyFor(head, { id: 'a', v: true }, { discriminator: true });
+    const key = queryKeyFor(head, { id: 'a', v: true }, { discriminator: 'method' });
     expect(key).toEqual(['things', 'a', { $method: 'HEAD', v: true }]);
     expect(Object.keys(key[2] as object)[0]).toBe('$method');
-    expect(queryKeyFor(head, { id: 'a' }, { discriminator: true })).toEqual(['things', 'a', { $method: 'HEAD' }]);
+    expect(queryKeyFor(head, { id: 'a' }, { discriminator: 'method' })).toEqual(['things', 'a', { $method: 'HEAD' }]);
     const scalar = spec({ method: 'POST', body: { kind: 'whole' } });
-    expect(queryKeyFor(scalar, 'x', { discriminator: true })).toEqual(['things', { $method: 'POST', $value: 'x' }]);
+    expect(queryKeyFor(scalar, 'x', { discriminator: 'method' })).toEqual(['things', { $method: 'POST', $value: 'x' }]);
+  });
+
+  it('marks the stream of a mixed method with $stream', () => {
+    const feed = spec({ path: '/feed', queryParams: { kind: 'kind' } });
+    const key = queryKeyFor(feed, { kind: 'a' }, { discriminator: 'stream' });
+    expect(key).toEqual(['feed', { $stream: true, kind: 'a' }]);
+    expect(Object.keys(key[1] as object)[0]).toBe('$stream');
+    expect(queryKeyFor(feed, {}, { discriminator: 'stream' })).toEqual(['feed', { $stream: true }]);
   });
 });
 
@@ -139,7 +147,7 @@ describe('keyPrefixFor and keyFor', () => {
       'a',
       { since: '2026-01-02T03:04:05.000Z' },
     ]);
-    const headKey = keyFor({ ...getThingSpec, method: 'HEAD' }, GetThingPayload, { discriminator: true });
+    const headKey = keyFor({ ...getThingSpec, method: 'HEAD' }, GetThingPayload, { discriminator: 'method' });
     expect(headKey({ id: 'a' })).toEqual(['api', 'things', 'a', { $method: 'HEAD' }]);
     expectTypeOf(getThingKey).parameter(0).toEqualTypeOf<GetThingPayload | undefined>();
   });
@@ -170,10 +178,20 @@ describe('queryFor', () => {
     expect(text).not.toContain('base');
   });
 
-  it('rejects in queryFn when the payload is invalid, and keys it by the prefix', async () => {
+  it('rejects in queryFn when the payload is invalid, under a key no real request has', async () => {
     const getThingQuery = queryFor(async () => ok(1), getThingSpec, GetThingPayload, { required: true });
     const options = getThingQuery(client, { id: 7 as unknown as string });
-    expect(options.queryKey).toEqual(['api', 'things']);
+    expect(options.queryKey).toEqual(['api', 'things', null, { $invalid: true }]);
+    // Not the key of the list under the same prefix, whose cache entry it would otherwise take over.
+    const listSpec = spec({ path: '/api/things', queryParams: { kind: 'kind' } });
+    const listQuery = queryFor(
+      async (_c: Client, _p?: { kind?: string }) => ok([]),
+      listSpec,
+      z.object({ kind: z.string().optional() }),
+      {},
+    );
+    expect(options.queryKey).not.toEqual(listQuery(client).queryKey);
+    expect(listQuery(client).queryKey).toEqual(['api', 'things']);
     await expect(options.queryFn({ signal: new AbortController().signal })).rejects.toBeInstanceOf(RequestValidationError);
   });
 
@@ -191,7 +209,7 @@ describe('queryFor', () => {
     const options = getThingQuery(client, undefined);
     expect(options.enabled).toBe(false);
     // Never the prefix, which another method's key may equal.
-    expect(options.queryKey).toEqual(['api', 'things', null]);
+    expect(options.queryKey).toEqual(['api', 'things', null, { $disabled: true }]);
     await expect(options.queryFn({ signal: new AbortController().signal })).rejects.toThrow(
       'query disabled: payload is undefined',
     );
@@ -199,6 +217,18 @@ describe('queryFor', () => {
     // The payload must be passed, if only as undefined.
     // @ts-expect-error missing payload
     getThingQuery(client);
+  });
+
+  it('disables a query without path parameters under a key that is not the list key', () => {
+    const Required = z.object({ kind: z.string() });
+    const listSpec = spec({ queryParams: { kind: 'kind' } });
+    const byKind = queryFor(async (_c: Client, _p: z.output<typeof Required>) => ok([]), listSpec, Required, {
+      required: true,
+    });
+    const list = queryFor(async (_c: Client, _p?: undefined) => ok([]), spec({}), null, {});
+    expect(list(client).queryKey).toEqual(['things']);
+    expect(byKind(client, undefined).queryKey).toEqual(['things', { $disabled: true }]);
+    expect(byKind(client, undefined).queryKey).not.toEqual(list(client).queryKey);
   });
 
   it('treats an omitted optional payload as empty, and a missing payload as none', async () => {
@@ -218,10 +248,16 @@ describe('queryFor', () => {
   it('discriminates the key when asked', () => {
     const headQuery = queryFor(async () => ok(1), { ...getThingSpec, method: 'HEAD' }, GetThingPayload, {
       required: true,
-      discriminator: true,
+      discriminator: 'method',
     });
     expect(headQuery(client, { id: 'a' }).queryKey).toEqual(['api', 'things', 'a', { $method: 'HEAD' }]);
-    expect(headQuery(client, undefined).queryKey).toEqual(['api', 'things', null, { $method: 'HEAD' }]);
+    expect(headQuery(client, undefined).queryKey).toEqual(['api', 'things', null, { $method: 'HEAD', $disabled: true }]);
+    expect(headQuery(client, { id: 1 as unknown as string }).queryKey).toEqual([
+      'api',
+      'things',
+      null,
+      { $method: 'HEAD', $invalid: true },
+    ]);
   });
 });
 
@@ -303,7 +339,7 @@ describe('streamFor', () => {
     const options = watchQuery(client, undefined, { streamedQuery });
     expect(options.enabled).toBe(false);
     expect(options.staleTime).toBe(Infinity);
-    expect(options.queryKey).toEqual(['things', null, 'events']);
+    expect(options.queryKey).toEqual(['things', null, 'events', { $disabled: true }]);
     await expect(received[0]!.streamFn({ signal: new AbortController().signal })).rejects.toThrow(
       'query disabled: payload is undefined',
     );

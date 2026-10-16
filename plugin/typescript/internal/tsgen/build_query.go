@@ -316,12 +316,22 @@ func finishQueries(services []*ServiceSpec) {
 			// A GET read keeps its clean key; everything else that shares
 			// the route is told apart by its verb. Two GETs on one route
 			// are the plain function and the stream of a mixed method: the
-			// stream is the one discriminated.
+			// stream is the one discriminated, as a stream.
 			switch {
 			case r.q.Verb != "GET":
-				r.q.Discriminator = true
+				r.q.Discriminator = "method"
 			case r.q.Kind == QueryStream && gets > 1:
-				r.q.Discriminator = true
+				r.q.Discriminator = "stream"
+			}
+		}
+		for _, r := range group {
+			for _, o := range group {
+				if o.q != r.q && o.q.Discriminator != "" {
+					mark := "`" + discriminatorMark(o.q) + "`"
+					if !slices.Contains(r.q.OtherMarks, mark) {
+						r.q.OtherMarks = append(r.q.OtherMarks, mark)
+					}
+				}
 			}
 			for _, o := range group {
 				if o.q != r.q {
@@ -363,6 +373,23 @@ func finishQueries(services []*ServiceSpec) {
 	}
 }
 
+// discriminatorMark names the property a discriminated key carries.
+func discriminatorMark(q *QuerySpec) string {
+	if q.Discriminator == "stream" {
+		return "$stream"
+	}
+	return "$method"
+}
+
+// discriminatorEntry renders the discriminator as it sits in the key, for
+// the state card.
+func discriminatorEntry(q *QuerySpec) string {
+	if q.Discriminator == "stream" {
+		return "$stream: true"
+	}
+	return `$method: "` + q.Verb + `"`
+}
+
 // invalidates reports whether the key prefix of a template matches the keys
 // of a route: every segment of the template is equal to the route's, a
 // parameter matching a parameter.
@@ -402,13 +429,13 @@ func keySource(ep *EndpointSpec, q *QuerySpec) string {
 		parts = append(parts, `"`+s+`"`)
 	}
 	var inputs []string
-	if q.Discriminator {
-		inputs = append(inputs, `$method: "`+q.Verb+`"`)
+	if q.Discriminator != "" {
+		inputs = append(inputs, discriminatorEntry(q))
 	}
 	if req != nil {
 		if req.Scalar {
 			if len(req.Path) == 0 {
-				if q.Discriminator {
+				if q.Discriminator != "" {
 					inputs = append(inputs, "$value: payload")
 				} else {
 					parts = append(parts, "payload")
@@ -494,8 +521,8 @@ func queryDecls(ep *EndpointSpec, q *QuerySpec, runtime map[string]struct{}) []Q
 	if q.Required {
 		flags = append(flags, "required: true")
 	}
-	if q.Discriminator {
-		flags = append(flags, "discriminator: true")
+	if q.Discriminator != "" {
+		flags = append(flags, "discriminator: "+tsString(q.Discriminator))
 	}
 	literal := func(fields []string) string {
 		if len(fields) == 0 {
@@ -517,10 +544,11 @@ func queryDecls(ep *EndpointSpec, q *QuerySpec, runtime map[string]struct{}) []Q
 		}
 		line("- Mutations & invalidation: %s", by)
 		if len(q.Collisions) > 0 {
-			if q.Discriminator {
-				line("- Collides with %s: the key carries `$method: %q`", strings.Join(q.Collisions, ", "), q.Verb)
+			if q.Discriminator != "" {
+				line("- Collides with %s: the key carries `%s`", strings.Join(q.Collisions, ", "), discriminatorEntry(q))
 			} else {
-				line("- Shares its path with %s, whose key carries `$method`", strings.Join(q.Collisions, ", "))
+				line("- Shares its path with %s, told apart by %s", strings.Join(q.Collisions, ", "),
+					strings.Join(q.OtherMarks, " and "))
 			}
 		}
 	case QueryMutation:
@@ -597,8 +625,8 @@ func queryDecls(ep *EndpointSpec, q *QuerySpec, runtime map[string]struct{}) []Q
 // keyDecl renders xyzKey.
 func keyDecl(q *QuerySpec, schema, stateCard string) QueryDecl {
 	args := q.SpecName + ", " + schema
-	if q.Discriminator {
-		args += ", { discriminator: true }"
+	if q.Discriminator != "" {
+		args += ", { discriminator: " + tsString(q.Discriminator) + " }"
 	}
 	return QueryDecl{
 		Doc: fmt.Sprintf("%s returns the key of a %s request, or without a payload the prefix\n", q.KeyName, q.FuncName) +

@@ -13,7 +13,7 @@ import { headThing, HeadThingPayload, headThingSpec } from './head-thing.js';
  * - Mutations & invalidation: `updateThingMutation`, `archiveThingMutation`
  * - Collides with `POST /things/{key}` (`legacy.fetchThingQuery`), `GET /things/{id}` (`getThingQuery`): the key carries `$method: "HEAD"`
  */
-export const headThingQuery = queryFor(headThing, headThingSpec, HeadThingPayload, { required: true, discriminator: true });
+export const headThingQuery = queryFor(headThing, headThingSpec, HeadThingPayload, { required: true, discriminator: 'method' });
 
 /**
  * headThingKey returns the key of a headThing request, or without a payload the prefix
@@ -25,4 +25,4 @@ export const headThingQuery = queryFor(headThing, headThingSpec, HeadThingPayloa
  * - Mutations & invalidation: `updateThingMutation`, `archiveThingMutation`
  * - Collides with `POST /things/{key}` (`legacy.fetchThingQuery`), `GET /things/{id}` (`getThingQuery`): the key carries `$method: "HEAD"`
  */
-export const headThingKey = keyFor(headThingSpec, HeadThingPayload, { discriminator: true });
+export const headThingKey = keyFor(headThingSpec, HeadThingPayload, { discriminator: 'method' });

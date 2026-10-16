@@ -348,9 +348,9 @@ toy.streamThingsSseKey({ id: 'abc' });                      // ['things', 'abc',
 toy.getThingKey();                                          // ['things']: the prefix, which matches every getThing key
 ```
 
-Credentials never enter a key (they are not in the request types), nor does anything of the client such as its base URL: a key names the data, not who asked for it or where. The service name does not either, so two services that serve the same path share keys, as they share URLs. A payload that fails validation is keyed by the prefix, and its `queryFn` rejects with the `RequestValidationError`.
+Credentials never enter a key (they are not in the request types), nor does anything of the client such as its base URL: a key names the data, not who asked for it or where. The service name does not either, so two services that serve the same path share keys, as they share URLs. A payload that fails validation gets a key no real request has, the route with `null` for each parameter and a trailing `{ $invalid: true }` (`['things', null, { $invalid: true }]`), and its `queryFn` rejects with the `RequestValidationError`; it never takes over the cache entry of another query, such as the list under the same prefix.
 
-**Dependent queries.** When the design requires a payload, `getThingQuery(client, undefined)` is accepted too and returns a disabled query (`enabled: false`) whose key is the route with `null` for each parameter, so that it never reads data cached for another query:
+**Dependent queries.** When the design requires a payload, `getThingQuery(client, undefined)` is accepted too and returns a disabled query (`enabled: false`) whose key is the route with `null` for each parameter and a trailing `{ $disabled: true }` (`['things', null, { $disabled: true }]`), so that it never reads data cached for another query, even for a route without parameters whose bare path is another method's key:
 
 ```ts
 const found = useQuery(toy.findThingQuery(client, { name }));
@@ -395,7 +395,7 @@ useMutation({
 });
 ```
 
-**Collisions.** Two queries or streams whose routes are the same once parameter names are ignored (`/things/{id}` and `/things/{thing_id}`), across every service, would share keys. The `GET` keeps its clean key; every other member gets `$method` first in its trailing object (`['things', 'abc', { $method: 'HEAD' }]`); when no member is a `GET`, all of them do. The stream of a mixed method, which shares the `GET` route of its plain function, gets `$method: 'GET'`. The state cards say so.
+**Collisions.** Two queries or streams whose routes are the same once parameter names are ignored (`/things/{id}` and `/things/{thing_id}`), across every service, would share keys. The `GET` keeps its clean key; every other member gets `$method` first in its trailing object (`['things', 'abc', { $method: 'HEAD' }]`); when no member is a `GET`, all of them do. The stream of a mixed method, which shares the `GET` route of its plain function, gets `$stream: true` instead (`['stream-or-list', { $stream: true }]`). The state cards say so. A disabled or invalid query keeps the discriminator first, before its sentinel.
 
 **Hooks.** None are generated, so the package does not depend on React or pin a TanStack adapter: the options work with `@tanstack/react-query`, `vue-query`, `solid-query` and plain `query-core` alike. A hook is a one-liner in the application, which also knows where its client comes from:
 

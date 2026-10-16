@@ -126,24 +126,29 @@ func TestBuildQueryCollisions(t *testing.T) {
 	things := service(t, pkg, "things")
 	for _, c := range []struct {
 		method, fn string
-		want       bool
+		want       string
 	}{
-		{"get_thing", "getThing", false},  // the GET keeps its clean key
-		{"head_thing", "headThing", true}, // {thing_id} is the same slot as {id}
-		{"feed", "feed", false},
-		{"feed", "feedStream", true}, // the stream of a mixed method shares the GET route
-		{"list_things", "listThings", false},
-		{"watch_thing", "watchThing", false},
+		{"get_thing", "getThing", ""},         // the GET keeps its clean key
+		{"head_thing", "headThing", "method"}, // {thing_id} is the same slot as {id}
+		{"feed", "feed", ""},
+		{"feed", "feedStream", "stream"}, // the stream of a mixed method shares the GET route
+		{"list_things", "listThings", ""},
+		{"watch_thing", "watchThing", ""},
 	} {
 		wantEqual(t, c.fn+" discriminator", query(t, endpoint(t, things, c.method), c.fn).Discriminator, c.want)
 	}
 	fetch := query(t, endpoint(t, service(t, pkg, "legacy"), "fetch_thing"), "fetchThing")
-	wantEqual(t, "a POST in another service", fetch.Discriminator, true)
+	wantEqual(t, "a POST in another service", fetch.Discriminator, "method")
 	wantEqual(t, "collisions", fetch.Collisions, []string{
 		"`GET /things/{id}` (`things.getThingQuery`)",
 		"`HEAD /things/{thing_id}` (`things.headThingQuery`)",
 	})
 	wantEqual(t, "source", fetch.Source, `["things", key, { $method: "POST", fields? }]`)
+	feed := endpoint(t, things, "feed")
+	wantEqual(t, "stream source", query(t, feed, "feedStream").Source, `["feed", { $stream: true, kind? }]`)
+	wantEqual(t, "clean key marks", query(t, feed, "feed").OtherMarks, []string{"`$stream`"})
+	wantEqual(t, "get marks", query(t, endpoint(t, things, "get_thing"), "getThing").OtherMarks,
+		[]string{"`$method`"})
 	wantEqual(t, "get source", query(t, endpoint(t, things, "get_thing"), "getThing").Source,
 		`["things", id, { tags?, verbose?, since?, trace? }]`)
 
@@ -174,9 +179,9 @@ func TestBuildQueryCollisions(t *testing.T) {
 		})
 	})
 	svc := service(t, pkg, "svc")
-	wantEqual(t, "peek", query(t, endpoint(t, svc, "peek"), "peek").Discriminator, true)
-	wantEqual(t, "lookup", query(t, endpoint(t, svc, "lookup"), "lookup").Discriminator, true)
-	wantEqual(t, "other", query(t, endpoint(t, svc, "other"), "other").Discriminator, false)
+	wantEqual(t, "peek", query(t, endpoint(t, svc, "peek"), "peek").Discriminator, "method")
+	wantEqual(t, "lookup", query(t, endpoint(t, svc, "lookup"), "lookup").Discriminator, "method")
+	wantEqual(t, "other", query(t, endpoint(t, svc, "other"), "other").Discriminator, "")
 }
 
 func TestBuildQueryErrors(t *testing.T) {

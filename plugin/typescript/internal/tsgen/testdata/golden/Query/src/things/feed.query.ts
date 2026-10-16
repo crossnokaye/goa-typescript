@@ -10,7 +10,7 @@ import { feed, FeedPayload, feedSpec, feedStream, feedStreamSpec } from './feed.
  * - Source: `["feed", { kind? }]`
  * - Writable: no
  * - Mutations & invalidation: none
- * - Shares its path with `GET /feed` (`feedStreamQuery`), whose key carries `$method`
+ * - Shares its path with `GET /feed` (`feedStreamQuery`), told apart by `$stream`
  */
 export const feedQuery = queryFor(feed, feedSpec, FeedPayload, {});
 
@@ -22,7 +22,7 @@ export const feedQuery = queryFor(feed, feedSpec, FeedPayload, {});
  * - Source: `["feed", { kind? }]`
  * - Writable: no
  * - Mutations & invalidation: none
- * - Shares its path with `GET /feed` (`feedStreamQuery`), whose key carries `$method`
+ * - Shares its path with `GET /feed` (`feedStreamQuery`), told apart by `$stream`
  */
 export const feedKey = keyFor(feedSpec, FeedPayload);
 
@@ -32,21 +32,21 @@ export const feedKey = keyFor(feedSpec, FeedPayload);
  * folds them with `reducer` and `initialValue`. `staleTime` is `Infinity`.
  *
  * - Owner: server
- * - Source: `["feed", { $method: "GET", kind? }]`
+ * - Source: `["feed", { $stream: true, kind? }]`
  * - Writable: no
  * - Mutations & invalidation: none
- * - Collides with `GET /feed` (`feedQuery`): the key carries `$method: "GET"`
+ * - Collides with `GET /feed` (`feedQuery`): the key carries `$stream: true`
  */
-export const feedStreamQuery = streamFor(feedStream, feedStreamSpec, FeedPayload, { discriminator: true });
+export const feedStreamQuery = streamFor(feedStream, feedStreamSpec, FeedPayload, { discriminator: 'stream' });
 
 /**
  * feedStreamKey returns the key of a feedStream request, or without a payload the prefix
  * `["feed"]` that every one of them starts with.
  *
  * - Owner: server
- * - Source: `["feed", { $method: "GET", kind? }]`
+ * - Source: `["feed", { $stream: true, kind? }]`
  * - Writable: no
  * - Mutations & invalidation: none
- * - Collides with `GET /feed` (`feedQuery`): the key carries `$method: "GET"`
+ * - Collides with `GET /feed` (`feedQuery`): the key carries `$stream: true`
  */
-export const feedStreamKey = keyFor(feedStreamSpec, FeedPayload, { discriminator: true });
+export const feedStreamKey = keyFor(feedStreamSpec, FeedPayload, { discriminator: 'stream' });

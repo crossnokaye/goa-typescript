@@ -126,11 +126,22 @@ describe('read queries', () => {
     expect(thing).toMatchObject({ id, name: 'echoed', kind: 'widget', enabled: true, created_at });
   });
 
-  it('keys an invalid payload by the prefix and rejects with the validation error', async () => {
+  it('keys an invalid payload apart from every real request and rejects with the validation error', async () => {
     const qc = queryClient();
     const options = toy.echoThingQuery(client(), { thing: { id: 'not-a-uuid' } });
-    expect(options.queryKey).toEqual(['things', 'echo']);
+    expect(options.queryKey).toEqual(['things', 'echo', { $invalid: true }]);
     await expect(qc.fetchQuery(options)).rejects.toBeInstanceOf(RequestValidationError);
+  });
+
+  it('leaves the list alone when a read under its prefix has an invalid payload', async () => {
+    const qc = queryClient();
+    const list = await qc.fetchQuery(toy.listThingsQuery(client()));
+    const invalid = toy.getThingQuery(client(), { id: 'abc', since: new Date(Number.NaN) });
+    expect(invalid.queryKey).toEqual(['things', null, { $invalid: true }]);
+    expect(invalid.queryKey).not.toEqual(toy.listThingsKey());
+    await expect(qc.fetchQuery(invalid)).rejects.toBeInstanceOf(RequestValidationError);
+    expect(qc.getQueryState(toy.listThingsKey())?.status).toBe('success');
+    expect(qc.getQueryData(toy.listThingsKey())).toBe(list);
   });
 
   it('keeps a HEAD apart from the GET on the same route', async () => {
@@ -151,7 +162,7 @@ describe('read queries', () => {
     const plain = toy.streamOrListQuery(client());
     const streamed = toy.streamOrListStreamQuery(client(), undefined, { streamedQuery });
     expect(plain.queryKey).toEqual(['stream-or-list']);
-    expect(streamed.queryKey).toEqual(['stream-or-list', { $method: 'GET' }]);
+    expect(streamed.queryKey).toEqual(['stream-or-list', { $stream: true }]);
     const [list, events] = await Promise.all([qc.fetchQuery(plain), qc.fetchQuery(streamed)]);
     expectTypeOf(list).toEqualTypeOf<ThingSummary[]>();
     expect(list.map((t) => t.id)).toEqual(['one', 'two']);
@@ -225,7 +236,7 @@ describe('stream queries', () => {
   it('disables a stream whose required payload is undefined', () => {
     const options = toy.streamThingsSseQuery(client(), undefined, { streamedQuery });
     expect(options.enabled).toBe(false);
-    expect(options.queryKey).toEqual(['things', null, 'events']);
+    expect(options.queryKey).toEqual(['things', null, 'events', { $disabled: true }]);
   });
 });
 

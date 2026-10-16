@@ -236,9 +236,13 @@ type QuerySpec struct {
 	KeyName string
 	// InvalidatesName is xyzInvalidates (mutations).
 	InvalidatesName string
-	// Discriminator is true when the key carries $method because another
-	// query shares its path.
-	Discriminator bool
+	// Discriminator tells the key apart from another query's on the same
+	// route: "method" puts $method in it, "stream" (the stream of a mixed
+	// method) puts $stream; "" for a clean key.
+	Discriminator string
+	// OtherMarks are the discriminators the colliding queries carry, e.g.
+	// "`$method`", for the state card of a clean key.
+	OtherMarks []string
 	// Collisions describe the queries that share the path, as `VERB /path` (`name`).
 	Collisions []string
 	// Invalidates are the path templates of the keys a mutation invalidates.

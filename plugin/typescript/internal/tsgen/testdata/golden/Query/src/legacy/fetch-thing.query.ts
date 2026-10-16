@@ -13,7 +13,7 @@ import { fetchThing, FetchThingPayload, fetchThingSpec } from './fetch-thing.js'
  * - Mutations & invalidation: `things.updateThingMutation`, `things.archiveThingMutation`
  * - Collides with `GET /things/{id}` (`things.getThingQuery`), `HEAD /things/{thing_id}` (`things.headThingQuery`): the key carries `$method: "POST"`
  */
-export const fetchThingQuery = queryFor(fetchThing, fetchThingSpec, FetchThingPayload, { required: true, discriminator: true });
+export const fetchThingQuery = queryFor(fetchThing, fetchThingSpec, FetchThingPayload, { required: true, discriminator: 'method' });
 
 /**
  * fetchThingKey returns the key of a fetchThing request, or without a payload the prefix
@@ -25,4 +25,4 @@ export const fetchThingQuery = queryFor(fetchThing, fetchThingSpec, FetchThingPa
  * - Mutations & invalidation: `things.updateThingMutation`, `things.archiveThingMutation`
  * - Collides with `GET /things/{id}` (`things.getThingQuery`), `HEAD /things/{thing_id}` (`things.headThingQuery`): the key carries `$method: "POST"`
  */
-export const fetchThingKey = keyFor(fetchThingSpec, FetchThingPayload, { discriminator: true });
+export const fetchThingKey = keyFor(fetchThingSpec, FetchThingPayload, { discriminator: 'method' });

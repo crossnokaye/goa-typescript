@@ -22,11 +22,12 @@ export type QueryKey = readonly unknown[];
 /** KeyFlags tune the key of one generated query. */
 export interface KeyFlags {
   /**
-   * discriminator puts `$method: '<VERB>'` first in the key's trailing
-   * object. The generator sets it on a query whose path collides with another
-   * query's, so that both keep their own cache entry.
+   * discriminator tells apart queries whose routes collide, so that each
+   * keeps its own cache entry: 'method' puts `$method: '<VERB>'` first in the
+   * key's trailing object, 'stream' puts `$stream: true` (the stream of a
+   * mixed method, which shares its plain function's verb and route).
    */
-  readonly discriminator?: boolean | undefined;
+  readonly discriminator?: 'method' | 'stream' | undefined;
 }
 
 /** QueryFlags tune one generated query or stream. */
@@ -301,17 +302,30 @@ function inputsOf(spec: EndpointSpec, wire: unknown): unknown {
 
 /** trailing adds the discriminator to the inputs of a key. */
 function trailing(spec: EndpointSpec, inputs: unknown, options?: KeyFlags): unknown {
-  if (!options?.discriminator) {
+  const mark = discriminatorOf(spec, options);
+  if (!mark) {
     return inputs;
   }
   if (inputs === undefined) {
-    return { $method: spec.method };
+    return mark;
   }
   if (isRecord(inputs)) {
-    return { $method: spec.method, ...inputs };
+    return { ...mark, ...inputs };
   }
   // A scalar or array payload has no property to sit beside.
-  return { $method: spec.method, $value: inputs };
+  return { ...mark, $value: inputs };
+}
+
+/** discriminatorOf is the entry the discriminator puts first in the trailing object, if any. */
+function discriminatorOf(spec: EndpointSpec, options?: KeyFlags): Record<string, unknown> | undefined {
+  switch (options?.discriminator) {
+    case 'method':
+      return { $method: spec.method };
+    case 'stream':
+      return { $stream: true };
+    default:
+      return undefined;
+  }
 }
 
 /**
@@ -345,29 +359,33 @@ export function keyPrefixFor(spec: EndpointSpec): QueryKey {
 }
 
 /**
- * disabledKeyFor is the key of a query whose required payload is
- * `undefined`: the path with `null` for every parameter. It is never the key
- * of a real request, so a disabled query never reads data cached for another.
+ * fallbackKeyFor is the key of a query that sends no request: the path with
+ * `null` for every parameter, then a trailing object holding the
+ * discriminator, if any, and a sentinel (`$disabled` for a required payload
+ * that is `undefined`, `$invalid` for a payload that fails validation). No
+ * real request has that key, so such a query never reads, or puts its error
+ * on, data cached for another.
  */
-function disabledKeyFor(spec: EndpointSpec, options?: KeyFlags): QueryKey {
+function fallbackKeyFor(
+  spec: EndpointSpec,
+  sentinel: '$disabled' | '$invalid',
+  options?: KeyFlags,
+): QueryKey {
   const key = substitute(spec, spec.path, undefined, false);
-  const rest = trailing(spec, undefined, options);
-  if (rest !== undefined) {
-    key.push(rest);
-  }
+  key.push({ ...discriminatorOf(spec, options), [sentinel]: true });
   return key;
 }
 
 type Keyed = { ok: true; key: QueryKey } | { ok: false; key: QueryKey; error: RequestValidationError };
 
-/** keyOf encodes a payload and derives its key; an invalid payload falls back to the prefix. */
+/** keyOf encodes a payload and derives its key; an invalid payload gets the `$invalid` fallback key. */
 function keyOf(spec: EndpointSpec, schema: z.ZodType | null, payload: unknown, flags?: KeyFlags): Keyed {
   if (schema === null) {
     return { ok: true, key: queryKeyFor(spec, undefined, flags) };
   }
   const wire = encode(schema, (payload ?? {}) as z.output<z.ZodType>);
   if (!wire.ok) {
-    return { ok: false, key: keyPrefixFor(spec), error: wire.error };
+    return { ok: false, key: fallbackKeyFor(spec, '$invalid', flags), error: wire.error };
   }
   return { ok: true, key: queryKeyFor(spec, wire.value, flags) };
 }
@@ -404,7 +422,7 @@ export function queryFor<P, R extends Result<unknown, unknown>, const F extends 
 ): QueryBuilder<P, ValueOf<R>, F> {
   const build = (client: Client, payload?: P): ReadQueryOptions<ValueOf<R>> => {
     if (payload === undefined && flags.required) {
-      return { queryKey: disabledKeyFor(spec, flags), queryFn: disabledQueryFn, enabled: false };
+      return { queryKey: fallbackKeyFor(spec, '$disabled', flags), queryFn: disabledQueryFn, enabled: false };
     }
     const keyed = keyOf(spec, schema, payload, flags);
     if (!keyed.ok) {
@@ -445,7 +463,7 @@ export function streamFor<P, R extends Result<unknown, unknown>, const F extends
     const { streamedQuery, ...rest } = params;
     const disabled = payload === undefined && !!flags.required;
     const keyed: Keyed = disabled
-      ? { ok: true, key: disabledKeyFor(spec, flags) }
+      ? { ok: true, key: fallbackKeyFor(spec, '$disabled', flags) }
       : keyOf(spec, schema, payload, flags);
     const streamFn: StreamFn<EventOf<R>> = disabled
       ? disabledQueryFn

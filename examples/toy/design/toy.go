@@ -232,6 +232,31 @@ var _ = Service("toy", func() {
 		})
 	})
 
+	Method("head_thing", func() {
+		Description("Answers a HEAD request with the version of a thing in the ETag header. Its route is " +
+			"get_thing's, so its query key carries $method.")
+		PayloadWithToken(func() {
+			Attribute("thing_id", String, "Thing identifier")
+			Required("thing_id")
+		})
+		Result(func() {
+			Attribute("etag", String)
+			Required("etag")
+		})
+		HTTP(func() {
+			HEAD("/things/{thing_id}")
+			Response(StatusOK, func() {
+				Header("etag:ETag")
+			})
+			// A HEAD response has no body: the service's errors answer
+			// with their status alone.
+			Response("not_found", StatusNotFound, func() { Body(Empty) })
+			Response("unauthorized", StatusUnauthorized, func() { Body(Empty) })
+			Response("bad_upstream", StatusBadGateway, func() { Body(Empty) })
+			Response("precondition_failed", StatusBadRequest, func() { Body(Empty) })
+		})
+	})
+
 	Method("get_thing_viewed", func() {
 		Description("Returns a result type rendered with the requested view.")
 		PayloadWithToken(func() {
@@ -288,6 +313,8 @@ var _ = Service("toy", func() {
 
 	Method("echo_thing", func() {
 		Description("Returns the thing it was sent, with the defaults the server applied to it.")
+		// A POST that only reads: query options rather than a mutation.
+		Meta("typescript:query:kind", "query")
 		PayloadWithToken(func() {
 			Attribute("thing", Thing)
 			Required("thing")
@@ -418,6 +445,15 @@ var _ = Service("toy", func() {
 			GET("/thing-count")
 			Param("fail")
 			Response("teapot", StatusTeapot)
+		})
+	})
+
+	Method("ping", func() {
+		Description("A read without a result: its query data is null.")
+		NoSecurity()
+		HTTP(func() {
+			GET("/ping")
+			Response(StatusNoContent)
 		})
 	})
 

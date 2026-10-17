@@ -20,6 +20,8 @@ var _ = API("toy", func() {
 	Description("Toy Goa services used to doc-test the goa-typescript plugin output.")
 	Version("0.0.1")
 	Meta("typescript:package", "toy-client")
+	// Generate TanStack Query options beside every function (ts/query.test.ts).
+	Meta("typescript:query", "tanstack")
 	Security(JWT)
 
 	Server("toy", func() {

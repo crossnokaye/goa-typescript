@@ -7,3 +7,10 @@ const {{ .SpecName }}: EndpointSpec = {{ .SpecTS }};
 export type {{ .ErrorTypeName }} ={{ .ErrorTS }};
 
 {{ template "partial_websocket_func" . }}
+{{- range .Queries }}
+{{- range .Decls }}
+
+{{ jsdoc .Doc "" -}}
+{{ .Code }}
+{{- end }}
+{{- end }}

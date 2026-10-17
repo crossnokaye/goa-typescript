@@ -27,6 +27,8 @@ type builder struct {
 	typeNames []string
 	// warnings collects remarks about the design for PackageSpec.Warnings.
 	warnings []string
+	// query is true when the TanStack Query layer is enabled.
+	query bool
 }
 
 // Build turns evaluated designs into the description of the TypeScript
@@ -53,6 +55,11 @@ func Build(roots []*expr.RootExpr, opts Options) (*PackageSpec, error) {
 		}
 		if pkg.Name == "" {
 			describePackage(pkg, root.API)
+			query, err := queryEnabled(root.API)
+			if err != nil {
+				return nil, err
+			}
+			pkg.Query = query
 		}
 		for _, svc := range root.API.HTTP.Services {
 			if svc.ServiceExpr == nil || disabled(svc.Meta) || disabled(svc.ServiceExpr.Meta) {
@@ -70,7 +77,7 @@ func Build(roots []*expr.RootExpr, opts Options) (*PackageSpec, error) {
 	}
 	sort.Slice(services, func(i, j int) bool { return services[i].http.Name() < services[j].http.Name() })
 
-	b := &builder{mapper: newTypeMapper(roots...)}
+	b := &builder{mapper: newTypeMapper(roots...), query: pkg.Query}
 	b.reserved = append(append([]string(nil), reservedGlobals...), runtimeExports(pkg.Runtime)...)
 
 	// Hoist every user type that an HTTP endpoint can carry, including the
@@ -125,6 +132,9 @@ func Build(roots []*expr.RootExpr, opts Options) (*PackageSpec, error) {
 			return nil, fmt.Errorf("service %q: %w", spec.Name, err)
 		}
 		pkg.Services = append(pkg.Services, spec)
+	}
+	if pkg.Query {
+		b.warnings = append(b.warnings, finishQueries(pkg.Services)...)
 	}
 	pkg.Warnings = b.warnings
 	return pkg, nil
@@ -181,6 +191,10 @@ func (b *builder) buildService(spec *ServiceSpec, svc *expr.HTTPServiceExpr) err
 	skip := func(method, reason string) {
 		spec.Skipped = append(spec.Skipped, SkippedEndpoint{Method: method, Reason: reason})
 	}
+	methods := make(map[string]*expr.MethodExpr)
+	for _, e := range endpoints(svc) {
+		methods[e.MethodExpr.Name] = e.MethodExpr
+	}
 	for _, e := range endpoints(svc) {
 		var (
 			method = e.MethodExpr.Name
@@ -200,11 +214,17 @@ func (b *builder) buildService(spec *ServiceSpec, svc *expr.HTTPServiceExpr) err
 			spec.HasREST = true
 		}
 		if reason := unsupported(e); reason != "" {
+			if err := b.skipQuery(e, reason); err != nil {
+				return err
+			}
 			skip(method, reason)
 			continue
 		}
 		if ws {
 			if reason := unsupportedWebSocket(e); reason != "" {
+				if err := b.skipQuery(e, reason); err != nil {
+					return err
+				}
 				skip(method, reason)
 				continue
 			}
@@ -212,6 +232,9 @@ func (b *builder) buildService(spec *ServiceSpec, svc *expr.HTTPServiceExpr) err
 		if plain {
 			if reason := unsupportedREST(e); reason != "" {
 				if !sse {
+					if err := b.skipQuery(e, reason); err != nil {
+						return err
+					}
 					skip(method, reason)
 					continue
 				}
@@ -245,7 +268,26 @@ func (b *builder) buildService(spec *ServiceSpec, svc *expr.HTTPServiceExpr) err
 					spec.Name, method, r.Status, strings.Join(r.Missing, ", ")))
 			}
 		}
+		if b.query {
+			if err := classifyQuery(e, ep, spec); err != nil {
+				return fmt.Errorf("method %q: %w", method, err)
+			}
+		}
 		spec.Endpoints = append(spec.Endpoints, ep)
+	}
+	if b.query {
+		return nameQueries(spec, methods, names)
+	}
+	return nil
+}
+
+// skipQuery rejects query options asked of a method the SDK skips.
+func (b *builder) skipQuery(e *expr.HTTPEndpointExpr, reason string) error {
+	if !b.query {
+		return nil
+	}
+	if err := checkSkippedQuery(e.MethodExpr, reason); err != nil {
+		return fmt.Errorf("method %q: %w", e.MethodExpr.Name, err)
 	}
 	return nil
 }

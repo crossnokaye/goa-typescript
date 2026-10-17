@@ -6,3 +6,4 @@ export * from './client.js';
 export * from './schema.js';
 export * from './sse.js';
 export * from './websocket.js';
+export * from './query.js';

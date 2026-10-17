@@ -63,6 +63,8 @@ func TestToyExample_GenerateAndRun(t *testing.T) {
 		"gen/ts/src/toy/stream-public-sse.ts",
 		"gen/ts/src/toy/stream-keyed-sse.ts",
 		"gen/ts/src/toy/get-thing.ts",
+		"gen/ts/src/toy/head-thing.ts",
+		"gen/ts/src/toy/ping.ts",
 		"gen/ts/src/toy/get-thing-viewed.ts",
 		"gen/ts/src/toy/list-things.ts",
 		"gen/ts/src/toy/create-thing.ts",

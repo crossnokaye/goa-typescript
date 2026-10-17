@@ -11,7 +11,9 @@ import {
   type EndpointSpec,
   type GoaError,
   goaErrorDecoder,
+  keyFor,
   type OtherErrorName,
+  queryFor,
   type RequestOptions,
   send,
 } from '../runtime/index.js';
@@ -32,13 +34,7 @@ export const HeadThingResult = z.object({
   etag: z.string().optional(),
 }) satisfies z.ZodType<HeadThingResult>;
 
-/**
- * headThingSpec is the transport mapping of headThing, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const headThingSpec: EndpointSpec = {
+const headThingSpec: EndpointSpec = {
   method: 'HEAD',
   path: '/things/{thing_id}',
   pathParams: { thing_id: 'thing_id' },
@@ -80,3 +76,28 @@ export async function headThing(
   }
   return decodeResponse(sent.value, HeadThingResult, headThingResponses, goaErrorDecoder(headThingErrors));
 }
+
+/**
+ * headThingQuery returns the query options of headThing, for `useQuery`, `fetchQuery` and the like.
+ * A payload of `undefined` returns a disabled query (`enabled: false`).
+ *
+ * - Owner: server
+ * - Source: `["things", thing_id, { $method: "HEAD" }]`
+ * - Writable: no
+ * - Mutations & invalidation: `updateThingMutation`, `deleteLabelMutation`, `archiveThingMutation`, `uploadContentMutation`
+ * - Collides with `POST /things/{key}` (`legacy.fetchThingQuery`), `GET /things/{id}` (`getThingQuery`): the key carries `$method: "HEAD"`
+ */
+export const headThingQuery = queryFor(headThing, headThingSpec, HeadThingPayload, { required: true, discriminator: 'method' });
+
+/**
+ * headThingKey returns the key of a headThing request. Without a payload it returns
+ * `["things"]`, an invalidation prefix that other methods under the same path share:
+ * it is not a cache key.
+ *
+ * - Owner: server
+ * - Source: `["things", thing_id, { $method: "HEAD" }]`
+ * - Writable: no
+ * - Mutations & invalidation: `updateThingMutation`, `deleteLabelMutation`, `archiveThingMutation`, `uploadContentMutation`
+ * - Collides with `POST /things/{key}` (`legacy.fetchThingQuery`), `GET /things/{id}` (`getThingQuery`): the key carries `$method: "HEAD"`
+ */
+export const headThingKey = keyFor(headThingSpec, HeadThingPayload, { discriminator: 'method' });

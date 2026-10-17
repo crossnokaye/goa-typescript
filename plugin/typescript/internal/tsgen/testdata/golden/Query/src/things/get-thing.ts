@@ -12,7 +12,9 @@ import {
   type EndpointSpec,
   type GoaError,
   goaErrorDecoder,
+  keyFor,
   type OtherErrorName,
+  queryFor,
   type RequestOptions,
   send,
 } from '../runtime/index.js';
@@ -34,13 +36,7 @@ export const GetThingPayload = z.object({
   trace: z.string().optional(),
 }) satisfies z.ZodType<GetThingPayload>;
 
-/**
- * getThingSpec is the transport mapping of getThing, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const getThingSpec: EndpointSpec = {
+const getThingSpec: EndpointSpec = {
   method: 'GET',
   path: '/things/{id}',
   pathParams: { id: 'id' },
@@ -85,3 +81,28 @@ export async function getThing(
   }
   return decodeResponse(sent.value, Thing, getThingResponses, goaErrorDecoder(getThingErrors));
 }
+
+/**
+ * getThingQuery returns the query options of getThing, for `useQuery`, `fetchQuery` and the like.
+ * A payload of `undefined` returns a disabled query (`enabled: false`).
+ *
+ * - Owner: server
+ * - Source: `["things", id, { tags?, verbose?, since?, trace? }]`
+ * - Writable: no
+ * - Mutations & invalidation: `updateThingMutation`, `deleteLabelMutation`, `archiveThingMutation`, `uploadContentMutation`
+ * - Shares its path with `POST /things/{key}` (`legacy.fetchThingQuery`), `HEAD /things/{thing_id}` (`headThingQuery`), told apart by `$method`
+ */
+export const getThingQuery = queryFor(getThing, getThingSpec, GetThingPayload, { required: true });
+
+/**
+ * getThingKey returns the key of a getThing request. Without a payload it returns
+ * `["things"]`, an invalidation prefix that other methods under the same path share:
+ * it is not a cache key.
+ *
+ * - Owner: server
+ * - Source: `["things", id, { tags?, verbose?, since?, trace? }]`
+ * - Writable: no
+ * - Mutations & invalidation: `updateThingMutation`, `deleteLabelMutation`, `archiveThingMutation`, `uploadContentMutation`
+ * - Shares its path with `POST /things/{key}` (`legacy.fetchThingQuery`), `HEAD /things/{thing_id}` (`headThingQuery`), told apart by `$method`
+ */
+export const getThingKey = keyFor(getThingSpec, GetThingPayload);

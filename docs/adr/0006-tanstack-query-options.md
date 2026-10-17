@@ -30,7 +30,7 @@ TanStack Query v5 ships `queryOptions`, `mutationOptions` and `experimental_stre
 
 ### Output
 
-- `src/<service>/<method>.query.ts`, re-exported by the service barrel. Per read or stream: `xyzQuery` and `xyzKey`; per mutation: `xyzMutation` and `xyzInvalidates`. A mixed method's stream exports are `xyzStreamQuery`/`xyzStreamKey`, after its `xyzStream` function. The endpoint file exports its `EndpointSpec` constant for the query file to use.
+- At the end of the method's own file, `src/<service>/<method>.ts`, after its function or functions, and so re-exported by the service barrel with them. Per read or stream: `xyzQuery` and `xyzKey`; per mutation: `xyzMutation` and `xyzInvalidates`. A mixed method's stream exports are `xyzStreamQuery`/`xyzStreamKey`, after its `xyzStream` function. The exports reference the file's `EndpointSpec` constant in-module, so it stays a private `const`, not part of the package's surface; the helpers they call join the file's runtime imports.
 - Every export is one line calling a runtime helper (`queryFor`, `streamFor`, `keyFor`, `mutationFor`, `invalidatesFor` in `runtime/src/query.ts`), so the logic is in the runtime and tested once.
 - Every export carries a JSDoc state card: Owner (server), Source (the key shape, e.g. `["things", id, { tags?, verbose? }]`), Writable (no), Mutations & invalidation (the generated mutations whose invalidation matches the key); for a mutation, Invalidates. Collisions are recorded there too.
 
@@ -72,7 +72,6 @@ Across every service, two reads, or two streams, whose routes are equal once par
 ### Neutral
 
 - A query that sends no request, a disabled dependent query or one whose payload fails validation, is keyed by its route with `null` for each parameter and a trailing object holding the markers, if any (`$stream`, `$method`), then a sentinel (`$disabled: true` or `$invalid: true`). Neither the bare prefix nor the route alone would do: the prefix can equal another method's full key (`["things"]` is also `listThings`'s), so can a route without parameters (`GET /things` with a required query parameter), and a disabled or failed observer still reads, or puts its error on, the cache entry of its key.
-- The endpoint file exports its `EndpointSpec` constant for the query file; the JSDoc tags it `@internal`, as a transport mapping and not a public contract.
 - The key grammar lives in two places that must agree: `runtime/src/query.ts`, which builds keys, and `keySource` in `build_query.go`, which renders them into the state cards. Each points at the other and at this ADR.
 - The stream helpers take `streamedQuery` from the caller on every call; the generated code cannot import it without importing TanStack. The structural types follow its 5.86+ shape (`streamFn`).
 
@@ -83,11 +82,12 @@ Across every service, two reads, or two streams, whose routes are equal once par
 3. **Verb-first keys** (`["GET", "things", id]`). Every key would carry the verb even though collisions are rare, and invalidating a resource would need one call per verb. `$method` appears only when needed.
 4. **Service and method keys** (`["toy", "getThing", payload]`). Stable under route changes, but invalidation by resource stops working: a write to `/things/{id}` cannot name the keys of every read under `/things` without the generator listing them, and two methods on one resource never share a prefix. The route is the resource, which is what invalidation is about.
 5. **Injecting `streamedQuery` once, on the client** (`createClient({ streamedQuery })`). One place to configure, but the client would carry a TanStack concern into every call site that does not use it, and the stream helpers' types could no longer infer the `TData` of a reducer from the call.
+6. **A sibling `<method>.query.ts` per method.** Keeps the endpoint file unchanged, but the query file needs the endpoint's transport mapping, which then has to be exported and becomes part of the package's surface whatever its documentation says. In the endpoint file the mapping stays private, and the barrel needs no second line per method.
 
 ## References
 
 - `runtime/src/query.ts`, `runtime/test/query.test.ts`.
-- `plugin/typescript/internal/tsgen/build_query.go`, `templates/endpoint_query.ts.tpl`, `testdata/golden/Query`.
+- `plugin/typescript/internal/tsgen/build_query.go`, `templates/endpoint_*.ts.tpl`, `testdata/golden/Query`.
 - `examples/toy/ts/query.test.ts`, run against `@tanstack/query-core` 5.104.3.
 - TanStack Query v5: `streamedQuery.ts`, `QueryClient.invalidateQueries`, `QueryObserverOptions`, `MutationOptions`.
 - ADR 0003, ADR 0005.

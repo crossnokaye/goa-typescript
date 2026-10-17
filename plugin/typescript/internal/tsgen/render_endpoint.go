@@ -3,7 +3,6 @@ package tsgen
 import (
 	"fmt"
 	"path"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -38,42 +37,8 @@ func renderService(pkg *PackageSpec, svc *ServiceSpec) []*codegen.File {
 			data.Doc = sseDoc(ep)
 		}
 		files = append(files, tsFile(pkg, path.Join("src", svc.Dir, ep.FileName+".ts"), tmpl, partials, data))
-		if len(ep.Queries) > 0 {
-			files = append(files, tsFile(pkg, path.Join("src", svc.Dir, ep.FileName+".query.ts"), "endpoint_query", nil,
-				queryData{EndpointSpec: ep, ImportBlock: queryImportBlock(ep)}))
-		}
 	}
 	return files
-}
-
-// queryData is what the query template renders.
-type queryData struct {
-	*EndpointSpec
-	ImportBlock string
-}
-
-// queryImportBlock imports the runtime helpers, and the functions, transport
-// mappings and request schemas of the endpoint file.
-func queryImportBlock(ep *EndpointSpec) string {
-	seen := make(map[string]struct{})
-	var local []string
-	for _, q := range ep.Queries {
-		for _, n := range []string{q.FuncName, q.SpecName, q.RequestName} {
-			if _, dup := seen[n]; dup || n == "" {
-				continue
-			}
-			seen[n] = struct{}{}
-			local = append(local, n)
-		}
-	}
-	sort.Slice(local, func(i, j int) bool {
-		if strings.EqualFold(local[i], local[j]) {
-			return local[i] < local[j]
-		}
-		return strings.ToLower(local[i]) < strings.ToLower(local[j])
-	})
-	return importStatement(ep.QueryImports, "../runtime/index.js") + "\n" +
-		importStatement(local, "./"+ep.FileName+".js")
 }
 
 // endpointData is what an endpoint template renders.

@@ -1,6 +1,7 @@
 package tsgen
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -43,7 +44,7 @@ func TestBuildQueryDisabledByDefault(t *testing.T) {
 			t.Errorf("%s: unexpected QueryNone %v", svc.Name, svc.QueryNone)
 		}
 		for _, ep := range svc.Endpoints {
-			if len(ep.Queries) > 0 || ep.ExportSpec {
+			if len(ep.Queries) > 0 {
 				t.Errorf("%s: query exports without the API meta", ep.MethodName)
 			}
 		}
@@ -86,8 +87,13 @@ func TestBuildQueryClassification(t *testing.T) {
 	wantEqual(t, "mixed names", []string{feed.Queries[0].Name, feed.Queries[0].KeyName, feed.Queries[1].Name, feed.Queries[1].KeyName},
 		[]string{"feedQuery", "feedKey", "feedStreamQuery", "feedStreamKey"})
 	wantEqual(t, "mixed specs", []string{feed.Queries[0].SpecName, feed.Queries[1].SpecName}, []string{"feedSpec", "feedStreamSpec"})
-	if !feed.ExportSpec || endpoint(t, things, "chat").ExportSpec {
-		t.Error("only classified endpoints export their transport mapping")
+	for _, name := range []string{"keyFor", "queryFor", "streamFor"} {
+		if !slices.Contains(feed.Imports.Runtime, name) {
+			t.Errorf("the feed file does not import %s: %v", name, feed.Imports.Runtime)
+		}
+	}
+	if slices.Contains(endpoint(t, things, "chat").Imports.Runtime, "keyFor") {
+		t.Error("an endpoint without query options imports no query helper")
 	}
 
 	upload := query(t, endpoint(t, things, "upload_content"), "uploadContent")

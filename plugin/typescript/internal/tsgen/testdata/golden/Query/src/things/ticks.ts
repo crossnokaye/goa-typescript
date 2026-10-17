@@ -8,7 +8,9 @@ import {
   connectWebSocket,
   encode,
   type EndpointSpec,
+  keyFor,
   type RequestValidationError,
+  streamFor,
   type TransportError,
   type WebSocketOptions,
   type WebSocketStream,
@@ -26,13 +28,7 @@ export const TicksPayload = z.object({
 export type TicksResult = number;
 export const TicksResult = z.int() satisfies z.ZodType<TicksResult>;
 
-/**
- * ticksSpec is the transport mapping of ticks, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const ticksSpec: EndpointSpec = {
+const ticksSpec: EndpointSpec = {
   method: 'GET',
   path: '/things/{id}/ticks',
   pathParams: { id: 'id' },
@@ -75,3 +71,28 @@ export async function ticks(
     single: false,
   });
 }
+
+/**
+ * ticksQuery returns the streamed query options of ticks. Pass TanStack's
+ * `experimental_streamedQuery` as `streamedQuery`; the data accumulates the events, or
+ * folds them with `reducer` and `initialValue`. `staleTime` is `Infinity`.
+ * A payload of `undefined` returns a disabled query (`enabled: false`).
+ *
+ * - Owner: server
+ * - Source: `["things", id, "ticks", { $stream: true }]`
+ * - Writable: no
+ * - Mutations & invalidation: none (mutations never invalidate streams)
+ */
+export const ticksQuery = streamFor(ticks, ticksSpec, TicksPayload, { required: true });
+
+/**
+ * ticksKey returns the key of a ticks request. Without a payload it returns
+ * `["things"]`, an invalidation prefix that other methods under the same path share:
+ * it is not a cache key.
+ *
+ * - Owner: server
+ * - Source: `["things", id, "ticks", { $stream: true }]`
+ * - Writable: no
+ * - Mutations & invalidation: none (mutations never invalidate streams)
+ */
+export const ticksKey = keyFor(ticksSpec, TicksPayload, { stream: true });

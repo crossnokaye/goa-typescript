@@ -8,18 +8,14 @@ import {
   type EndpointSpec,
   type GoaError,
   goaErrorDecoder,
+  invalidatesFor,
+  mutationFor,
   type OtherErrorName,
   type RequestOptions,
   send,
 } from '../runtime/index.js';
 
-/**
- * touchSpec is the transport mapping of touch, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const touchSpec: EndpointSpec = {
+const touchSpec: EndpointSpec = {
   method: 'POST',
   path: '/touch',
   pathParams: {},
@@ -57,3 +53,21 @@ export async function touch(
   }
   return decodeResponse(sent.value, null, touchResponses, goaErrorDecoder(touchErrors));
 }
+
+/**
+ * touchInvalidates returns the keys touch invalidates, from its variables, for wiring
+ * invalidation by hand.
+ *
+ * - Owner: server
+ * - Invalidates: nothing
+ */
+export const touchInvalidates = invalidatesFor(touchSpec, null, []);
+
+/**
+ * touchMutation returns the mutation options of touch, for `useMutation`. Given
+ * `{ queryClient }`, `onSuccess` invalidates the keys below (never a stream's).
+ *
+ * - Owner: server
+ * - Invalidates: nothing
+ */
+export const touchMutation = mutationFor(touch, touchInvalidates);

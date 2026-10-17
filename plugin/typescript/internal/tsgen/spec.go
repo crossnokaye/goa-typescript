@@ -190,15 +190,10 @@ type EndpointSpec struct {
 	WS       *WebSocketSpec
 	// Imports is what the endpoint file imports.
 	Imports Imports
-	// Queries are the TanStack Query exports of the method, rendered into
-	// <FileName>.query.ts: the plain function's, then the stream's. Empty
-	// unless the layer is enabled and the method is classified.
+	// Queries are the TanStack Query exports of the method, rendered at the
+	// end of the endpoint file: the plain function's, then the stream's.
+	// Empty unless the layer is enabled and the method is classified.
 	Queries []*QuerySpec
-	// QueryImports is what the query file imports from the runtime.
-	QueryImports []string
-	// ExportSpec is true when the transport mapping constants are exported,
-	// for the query file to use.
-	ExportSpec bool
 }
 
 // QueryKind is how the TanStack Query layer classifies a generated function.
@@ -260,7 +255,7 @@ type QuerySpec struct {
 	Decls []QueryDecl
 }
 
-// QueryDecl is one export of a query file.
+// QueryDecl is one query export of an endpoint file.
 type QueryDecl struct {
 	Doc  string
 	Code string

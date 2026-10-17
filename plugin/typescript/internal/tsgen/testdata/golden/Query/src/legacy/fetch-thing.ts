@@ -11,7 +11,9 @@ import {
   type EndpointSpec,
   type GoaError,
   goaErrorDecoder,
+  keyFor,
   type OtherErrorName,
+  queryFor,
   type RequestOptions,
   send,
 } from '../runtime/index.js';
@@ -27,13 +29,7 @@ export const FetchThingPayload = z.object({
   fields: z.array(z.string()).optional(),
 }) satisfies z.ZodType<FetchThingPayload>;
 
-/**
- * fetchThingSpec is the transport mapping of fetchThing, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const fetchThingSpec: EndpointSpec = {
+const fetchThingSpec: EndpointSpec = {
   method: 'POST',
   path: '/things/{key}',
   pathParams: { key: 'key' },
@@ -76,3 +72,28 @@ export async function fetchThing(
   }
   return decodeResponse(sent.value, Thing, fetchThingResponses, goaErrorDecoder(fetchThingErrors));
 }
+
+/**
+ * fetchThingQuery returns the query options of fetchThing, for `useQuery`, `fetchQuery` and the like.
+ * A payload of `undefined` returns a disabled query (`enabled: false`).
+ *
+ * - Owner: server
+ * - Source: `["things", key, { $method: "POST", fields? }]`
+ * - Writable: no
+ * - Mutations & invalidation: `things.updateThingMutation`, `things.deleteLabelMutation`, `things.archiveThingMutation`, `things.uploadContentMutation`
+ * - Collides with `GET /things/{id}` (`things.getThingQuery`), `HEAD /things/{thing_id}` (`things.headThingQuery`): the key carries `$method: "POST"`
+ */
+export const fetchThingQuery = queryFor(fetchThing, fetchThingSpec, FetchThingPayload, { required: true, discriminator: 'method' });
+
+/**
+ * fetchThingKey returns the key of a fetchThing request. Without a payload it returns
+ * `["things"]`, an invalidation prefix that other methods under the same path share:
+ * it is not a cache key.
+ *
+ * - Owner: server
+ * - Source: `["things", key, { $method: "POST", fields? }]`
+ * - Writable: no
+ * - Mutations & invalidation: `things.updateThingMutation`, `things.deleteLabelMutation`, `things.archiveThingMutation`, `things.uploadContentMutation`
+ * - Collides with `GET /things/{id}` (`things.getThingQuery`), `HEAD /things/{thing_id}` (`things.headThingQuery`): the key carries `$method: "POST"`
+ */
+export const fetchThingKey = keyFor(fetchThingSpec, FetchThingPayload, { discriminator: 'method' });

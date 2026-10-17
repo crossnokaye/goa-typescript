@@ -11,6 +11,8 @@ import {
   type EndpointSpec,
   type GoaError,
   goaErrorDecoder,
+  invalidatesFor,
+  mutationFor,
   type OtherErrorName,
   type RequestOptions,
   send,
@@ -26,13 +28,7 @@ export const UploadContentPayload = z.object({
   content_type: z.string().optional(),
 }) satisfies z.ZodType<UploadContentPayload>;
 
-/**
- * uploadContentSpec is the transport mapping of uploadContent, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const uploadContentSpec: EndpointSpec = {
+const uploadContentSpec: EndpointSpec = {
   method: 'PUT',
   path: '/things/{id}/content',
   pathParams: { id: 'id' },
@@ -77,3 +73,22 @@ export async function uploadContent(
   }
   return decodeResponse(sent.value, null, uploadContentResponses, goaErrorDecoder(uploadContentErrors));
 }
+
+/**
+ * uploadContentInvalidates returns the keys uploadContent invalidates, from its variables, for wiring
+ * invalidation by hand.
+ *
+ * - Owner: server
+ * - Invalidates: `["things", id]`
+ */
+export const uploadContentInvalidates = invalidatesFor(uploadContentSpec, UploadContentPayload, ['/things/{id}'], { raw: true });
+
+/**
+ * uploadContentMutation returns the mutation options of uploadContent, for `useMutation`. Given
+ * `{ queryClient }`, `onSuccess` invalidates the keys below (never a stream's).
+ * The variables are `{ payload, body }`.
+ *
+ * - Owner: server
+ * - Invalidates: `["things", id]`
+ */
+export const uploadContentMutation = mutationFor(uploadContent, uploadContentInvalidates, { raw: true });

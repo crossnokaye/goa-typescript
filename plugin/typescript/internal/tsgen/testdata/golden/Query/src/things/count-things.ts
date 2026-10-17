@@ -10,7 +10,9 @@ import {
   type EndpointSpec,
   type GoaError,
   goaErrorDecoder,
+  keyFor,
   type OtherErrorName,
+  queryFor,
   type RequestOptions,
   send,
 } from '../runtime/index.js';
@@ -19,13 +21,7 @@ import {
 export type CountThingsResult = number;
 export const CountThingsResult = z.int() satisfies z.ZodType<CountThingsResult>;
 
-/**
- * countThingsSpec is the transport mapping of countThings, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const countThingsSpec: EndpointSpec = {
+const countThingsSpec: EndpointSpec = {
   method: 'GET',
   path: '/count',
   pathParams: {},
@@ -63,3 +59,25 @@ export async function countThings(
   }
   return decodeResponse(sent.value, CountThingsResult, countThingsResponses, goaErrorDecoder(countThingsErrors));
 }
+
+/**
+ * countThingsQuery returns the query options of countThings, for `useQuery`, `fetchQuery` and the like.
+ *
+ * - Owner: server
+ * - Source: `["count"]`
+ * - Writable: no
+ * - Mutations & invalidation: none
+ */
+export const countThingsQuery = queryFor(countThings, countThingsSpec, null, {});
+
+/**
+ * countThingsKey returns the key of a countThings request. Without a payload it returns
+ * `["count"]`, an invalidation prefix that matches every countThings request and is no other
+ * query's key.
+ *
+ * - Owner: server
+ * - Source: `["count"]`
+ * - Writable: no
+ * - Mutations & invalidation: none
+ */
+export const countThingsKey = keyFor(countThingsSpec, null);

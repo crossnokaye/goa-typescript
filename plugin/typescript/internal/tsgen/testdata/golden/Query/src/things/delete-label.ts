@@ -11,6 +11,8 @@ import {
   type EndpointSpec,
   type GoaError,
   goaErrorDecoder,
+  invalidatesFor,
+  mutationFor,
   type OtherErrorName,
   type RequestOptions,
   send,
@@ -26,13 +28,7 @@ export const DeleteLabelPayload = z.object({
   label_id: z.string(),
 }) satisfies z.ZodType<DeleteLabelPayload>;
 
-/**
- * deleteLabelSpec is the transport mapping of deleteLabel, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const deleteLabelSpec: EndpointSpec = {
+const deleteLabelSpec: EndpointSpec = {
   method: 'DELETE',
   path: '/things/{id}/labels/{label_id}',
   pathParams: { id: 'id', label_id: 'label_id' },
@@ -70,3 +66,21 @@ export async function deleteLabel(
   }
   return decodeResponse(sent.value, null, deleteLabelResponses, goaErrorDecoder(deleteLabelErrors));
 }
+
+/**
+ * deleteLabelInvalidates returns the keys deleteLabel invalidates, from its variables, for wiring
+ * invalidation by hand.
+ *
+ * - Owner: server
+ * - Invalidates: `["things", id]`
+ */
+export const deleteLabelInvalidates = invalidatesFor(deleteLabelSpec, DeleteLabelPayload, ['/things/{id}']);
+
+/**
+ * deleteLabelMutation returns the mutation options of deleteLabel, for `useMutation`. Given
+ * `{ queryClient }`, `onSuccess` invalidates the keys below (never a stream's).
+ *
+ * - Owner: server
+ * - Invalidates: `["things", id]`
+ */
+export const deleteLabelMutation = mutationFor(deleteLabel, deleteLabelInvalidates);

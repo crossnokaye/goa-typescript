@@ -11,6 +11,8 @@ import {
   type EndpointSpec,
   type GoaError,
   goaErrorDecoder,
+  invalidatesFor,
+  mutationFor,
   type OtherErrorName,
   type RequestOptions,
   send,
@@ -24,13 +26,7 @@ export const RunJobPayload = z.object({
   id: z.string(),
 }) satisfies z.ZodType<RunJobPayload>;
 
-/**
- * runJobSpec is the transport mapping of runJob, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const runJobSpec: EndpointSpec = {
+const runJobSpec: EndpointSpec = {
   method: 'POST',
   path: '/jobs/{id}/run',
   pathParams: { id: 'id' },
@@ -72,3 +68,21 @@ export async function runJob(
   }
   return decodeResponse(sent.value, null, runJobResponses, goaErrorDecoder(runJobErrors));
 }
+
+/**
+ * runJobInvalidates returns the keys runJob invalidates, from its variables, for wiring
+ * invalidation by hand.
+ *
+ * - Owner: server
+ * - Invalidates: `["jobs"]` (no query lives under it)
+ */
+export const runJobInvalidates = invalidatesFor(runJobSpec, RunJobPayload, ['/jobs']);
+
+/**
+ * runJobMutation returns the mutation options of runJob, for `useMutation`. Given
+ * `{ queryClient }`, `onSuccess` invalidates the keys below (never a stream's).
+ *
+ * - Owner: server
+ * - Invalidates: `["jobs"]` (no query lives under it)
+ */
+export const runJobMutation = mutationFor(runJob, runJobInvalidates);

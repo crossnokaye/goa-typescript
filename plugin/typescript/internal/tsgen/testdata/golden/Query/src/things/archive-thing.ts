@@ -11,6 +11,8 @@ import {
   type EndpointSpec,
   type GoaError,
   goaErrorDecoder,
+  invalidatesFor,
+  mutationFor,
   type OtherErrorName,
   type RequestOptions,
   send,
@@ -24,13 +26,7 @@ export const ArchiveThingPayload = z.object({
   id: z.string(),
 }) satisfies z.ZodType<ArchiveThingPayload>;
 
-/**
- * archiveThingSpec is the transport mapping of archiveThing, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const archiveThingSpec: EndpointSpec = {
+const archiveThingSpec: EndpointSpec = {
   method: 'POST',
   path: '/things/{id}/archive',
   pathParams: { id: 'id' },
@@ -72,3 +68,21 @@ export async function archiveThing(
   }
   return decodeResponse(sent.value, null, archiveThingResponses, goaErrorDecoder(archiveThingErrors));
 }
+
+/**
+ * archiveThingInvalidates returns the keys archiveThing invalidates, from its variables, for wiring
+ * invalidation by hand.
+ *
+ * - Owner: server
+ * - Invalidates: `["things"]`
+ */
+export const archiveThingInvalidates = invalidatesFor(archiveThingSpec, ArchiveThingPayload, ['/things']);
+
+/**
+ * archiveThingMutation returns the mutation options of archiveThing, for `useMutation`. Given
+ * `{ queryClient }`, `onSuccess` invalidates the keys below (never a stream's).
+ *
+ * - Owner: server
+ * - Invalidates: `["things"]`
+ */
+export const archiveThingMutation = mutationFor(archiveThing, archiveThingInvalidates);

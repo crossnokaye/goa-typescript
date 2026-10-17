@@ -11,7 +11,9 @@ import {
   type EndpointSpec,
   type GoaError,
   goaErrorDecoder,
+  keyFor,
   type OtherErrorName,
+  queryFor,
   type RequestOptions,
   send,
 } from '../runtime/index.js';
@@ -32,13 +34,7 @@ export const ListThingsPayload = z.object({
 export type ListThingsResult = Thing[];
 export const ListThingsResult = z.array(Thing) satisfies z.ZodType<ListThingsResult>;
 
-/**
- * listThingsSpec is the transport mapping of listThings, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const listThingsSpec: EndpointSpec = {
+const listThingsSpec: EndpointSpec = {
   method: 'GET',
   path: '/things',
   pathParams: {},
@@ -76,3 +72,25 @@ export async function listThings(
   }
   return decodeResponse(sent.value, ListThingsResult, listThingsResponses, goaErrorDecoder(listThingsErrors));
 }
+
+/**
+ * listThingsQuery returns the query options of listThings, for `useQuery`, `fetchQuery` and the like.
+ *
+ * - Owner: server
+ * - Source: `["things", { kind?, limit? }]`
+ * - Writable: no
+ * - Mutations & invalidation: `updateThingMutation`, `archiveThingMutation`
+ */
+export const listThingsQuery = queryFor(listThings, listThingsSpec, ListThingsPayload, {});
+
+/**
+ * listThingsKey returns the key of a listThings request. Without a payload it returns
+ * `["things"]`, an invalidation prefix that matches every listThings request and is no other
+ * query's key.
+ *
+ * - Owner: server
+ * - Source: `["things", { kind?, limit? }]`
+ * - Writable: no
+ * - Mutations & invalidation: `updateThingMutation`, `archiveThingMutation`
+ */
+export const listThingsKey = keyFor(listThingsSpec, ListThingsPayload);

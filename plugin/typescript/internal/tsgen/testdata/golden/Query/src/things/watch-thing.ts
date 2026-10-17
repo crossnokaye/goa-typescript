@@ -11,9 +11,11 @@ import {
   EventStream,
   type GoaError,
   goaErrorDecoder,
+  keyFor,
   type OtherErrorName,
   send,
   sseDecoder,
+  streamFor,
   type StreamOptions,
   UnexpectedResponseError,
 } from '../runtime/index.js';
@@ -29,13 +31,7 @@ export const WatchThingPayload = z.object({
   delay_ms: z.int().optional(),
 }) satisfies z.ZodType<WatchThingPayload>;
 
-/**
- * watchThingSpec is the transport mapping of watchThing, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const watchThingSpec: EndpointSpec = {
+const watchThingSpec: EndpointSpec = {
   method: 'GET',
   path: '/things/{id}/events',
   pathParams: { id: 'id' },
@@ -94,3 +90,28 @@ export async function watchThing(
     response: res,
   };
 }
+
+/**
+ * watchThingQuery returns the streamed query options of watchThing. Pass TanStack's
+ * `experimental_streamedQuery` as `streamedQuery`; the data accumulates the events, or
+ * folds them with `reducer` and `initialValue`. `staleTime` is `Infinity`.
+ * A payload of `undefined` returns a disabled query (`enabled: false`).
+ *
+ * - Owner: server
+ * - Source: `["things", id, "events", { $stream: true, delay_ms? }]`
+ * - Writable: no
+ * - Mutations & invalidation: none (mutations never invalidate streams)
+ */
+export const watchThingQuery = streamFor(watchThing, watchThingSpec, WatchThingPayload, { required: true });
+
+/**
+ * watchThingKey returns the key of a watchThing request. Without a payload it returns
+ * `["things"]`, an invalidation prefix that other methods under the same path share:
+ * it is not a cache key.
+ *
+ * - Owner: server
+ * - Source: `["things", id, "events", { $stream: true, delay_ms? }]`
+ * - Writable: no
+ * - Mutations & invalidation: none (mutations never invalidate streams)
+ */
+export const watchThingKey = keyFor(watchThingSpec, WatchThingPayload, { stream: true });

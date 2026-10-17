@@ -65,9 +65,9 @@ gen/ts/
     ├── runtime/*.ts        the runtime, copied verbatim
     └── <service>/
         ├── index.ts        barrel for the service
-        ├── <method>.ts     one function per method: its request type, error table, error union
-        │                   (two functions when the method offers both a plain result and a stream)
-        └── <method>.query.ts  TanStack Query options, with Meta("typescript:query", "tanstack")
+        └── <method>.ts     one function per method: its request type, error table, error union
+                            (two functions when the method offers both a plain result and a stream),
+                            then its TanStack Query options with Meta("typescript:query", "tanstack")
 ```
 
 The package is TypeScript source, not a build: `package.json` exports point at `.ts` files, and relative imports use the `.js` suffix that bundler module resolution maps back to them.
@@ -317,9 +317,7 @@ var _ = API("toy", func() {
 })
 ```
 
-The endpoint file of a classified method exports its transport mapping (`getThingSpec`) for the query file beside it. It is tagged `@internal`: it is not part of the package's contract and may change between releases.
-
-Nothing in the generated package imports TanStack: the runtime (`runtime/query.ts`) declares the shapes TanStack accepts structurally, and the toy's tests prove them against `@tanstack/query-core`. Each method's exports live in `src/<service>/<method>.query.ts`, re-exported by the service barrel, one line each calling a runtime helper, and each carries a JSDoc state card: who owns the data (the server), the key it lives under, that it is not writable, and which generated mutations invalidate it.
+Nothing in the generated package imports TanStack: the runtime (`runtime/query.ts`) declares the shapes TanStack accepts structurally, and the toy's tests prove them against `@tanstack/query-core`. Each method's exports sit at the end of its own file, `src/<service>/<method>.ts`, after its function, so they are re-exported by the service barrel with it; the transport mapping they use stays private to that file. They are one line each calling a runtime helper, and each carries a JSDoc state card: who owns the data (the server), the key it lives under, that it is not writable, and which generated mutations invalidate it.
 
 | Method | Exports | Returns |
 |---|---|---|

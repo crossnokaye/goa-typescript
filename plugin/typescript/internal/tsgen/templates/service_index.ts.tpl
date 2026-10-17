@@ -5,9 +5,6 @@
 {{- if .Endpoints }}
 {{ range .Endpoints }}
 export * from './{{ .FileName }}.js';
-{{- if .Queries }}
-export * from './{{ .FileName }}.query.js';
-{{- end }}
 {{- end }}
 {{- else }}
 

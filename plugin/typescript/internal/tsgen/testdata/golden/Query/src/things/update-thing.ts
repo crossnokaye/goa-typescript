@@ -11,6 +11,8 @@ import {
   type EndpointSpec,
   type GoaError,
   goaErrorDecoder,
+  invalidatesFor,
+  mutationFor,
   type OtherErrorName,
   type RequestOptions,
   send,
@@ -27,13 +29,7 @@ export const UpdateThingPayload = z.object({
   name: z.string(),
 }) satisfies z.ZodType<UpdateThingPayload>;
 
-/**
- * updateThingSpec is the transport mapping of updateThing, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const updateThingSpec: EndpointSpec = {
+const updateThingSpec: EndpointSpec = {
   method: 'PUT',
   path: '/things/{id}',
   pathParams: { id: 'id' },
@@ -72,3 +68,21 @@ export async function updateThing(
   }
   return decodeResponse(sent.value, Thing, updateThingResponses, goaErrorDecoder(updateThingErrors));
 }
+
+/**
+ * updateThingInvalidates returns the keys updateThing invalidates, from its variables, for wiring
+ * invalidation by hand.
+ *
+ * - Owner: server
+ * - Invalidates: `["things"]`
+ */
+export const updateThingInvalidates = invalidatesFor(updateThingSpec, UpdateThingPayload, ['/things']);
+
+/**
+ * updateThingMutation returns the mutation options of updateThing, for `useMutation`. Given
+ * `{ queryClient }`, `onSuccess` invalidates the keys below (never a stream's).
+ *
+ * - Owner: server
+ * - Invalidates: `["things"]`
+ */
+export const updateThingMutation = mutationFor(updateThing, updateThingInvalidates);

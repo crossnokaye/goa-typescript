@@ -11,7 +11,9 @@ import {
   type EndpointSpec,
   type GoaError,
   goaErrorDecoder,
+  keyFor,
   type OtherErrorName,
+  queryFor,
   type RequestOptions,
   send,
 } from '../runtime/index.js';
@@ -31,13 +33,7 @@ export const SearchThingsPayload = z.object({
 export type SearchThingsResult = Thing[];
 export const SearchThingsResult = z.array(Thing) satisfies z.ZodType<SearchThingsResult>;
 
-/**
- * searchThingsSpec is the transport mapping of searchThings, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const searchThingsSpec: EndpointSpec = {
+const searchThingsSpec: EndpointSpec = {
   method: 'POST',
   path: '/things/search',
   pathParams: {},
@@ -80,3 +76,26 @@ export async function searchThings(
   }
   return decodeResponse(sent.value, SearchThingsResult, searchThingsResponses, goaErrorDecoder(searchThingsErrors));
 }
+
+/**
+ * searchThingsQuery returns the query options of searchThings, for `useQuery`, `fetchQuery` and the like.
+ * A payload of `undefined` returns a disabled query (`enabled: false`).
+ *
+ * - Owner: server
+ * - Source: `["things", "search", { text, kinds? }]`
+ * - Writable: no
+ * - Mutations & invalidation: `updateThingMutation`, `archiveThingMutation`
+ */
+export const searchThingsQuery = queryFor(searchThings, searchThingsSpec, SearchThingsPayload, { required: true });
+
+/**
+ * searchThingsKey returns the key of a searchThings request. Without a payload it returns
+ * `["things", "search"]`, an invalidation prefix that matches every searchThings request and is no other
+ * query's key.
+ *
+ * - Owner: server
+ * - Source: `["things", "search", { text, kinds? }]`
+ * - Writable: no
+ * - Mutations & invalidation: `updateThingMutation`, `archiveThingMutation`
+ */
+export const searchThingsKey = keyFor(searchThingsSpec, SearchThingsPayload);

@@ -12,10 +12,13 @@ import {
   EventStream,
   type GoaError,
   goaErrorDecoder,
+  keyFor,
   type OtherErrorName,
+  queryFor,
   type RequestOptions,
   send,
   sseDecoder,
+  streamFor,
   type StreamOptions,
   UnexpectedResponseError,
 } from '../runtime/index.js';
@@ -33,13 +36,7 @@ export const FeedPayload = z.object({
 export type FeedResult = Thing[];
 export const FeedResult = z.array(Thing) satisfies z.ZodType<FeedResult>;
 
-/**
- * feedSpec is the transport mapping of feed, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const feedSpec: EndpointSpec = {
+const feedSpec: EndpointSpec = {
   method: 'GET',
   path: '/feed',
   pathParams: {},
@@ -49,13 +46,7 @@ export const feedSpec: EndpointSpec = {
   security: [],
 };
 
-/**
- * feedStreamSpec is the transport mapping of feedStream, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const feedStreamSpec: EndpointSpec = {
+const feedStreamSpec: EndpointSpec = {
   method: 'GET',
   path: '/feed',
   pathParams: {},
@@ -141,3 +132,49 @@ export async function feedStream(
     response: res,
   };
 }
+
+/**
+ * feedQuery returns the query options of feed, for `useQuery`, `fetchQuery` and the like.
+ *
+ * - Owner: server
+ * - Source: `["feed", { kind? }]`
+ * - Writable: no
+ * - Mutations & invalidation: none
+ */
+export const feedQuery = queryFor(feed, feedSpec, FeedPayload, {});
+
+/**
+ * feedKey returns the key of a feed request. Without a payload it returns
+ * `["feed"]`, an invalidation prefix that matches every feed request and is no other
+ * query's key.
+ *
+ * - Owner: server
+ * - Source: `["feed", { kind? }]`
+ * - Writable: no
+ * - Mutations & invalidation: none
+ */
+export const feedKey = keyFor(feedSpec, FeedPayload);
+
+/**
+ * feedStreamQuery returns the streamed query options of feedStream. Pass TanStack's
+ * `experimental_streamedQuery` as `streamedQuery`; the data accumulates the events, or
+ * folds them with `reducer` and `initialValue`. `staleTime` is `Infinity`.
+ *
+ * - Owner: server
+ * - Source: `["feed", { $stream: true, kind? }]`
+ * - Writable: no
+ * - Mutations & invalidation: none (mutations never invalidate streams)
+ */
+export const feedStreamQuery = streamFor(feedStream, feedStreamSpec, FeedPayload, {});
+
+/**
+ * feedStreamKey returns the key of a feedStream request. Without a payload it returns
+ * `["feed", { $stream: true }]`, an invalidation prefix that matches every feedStream request and is no other
+ * query's key.
+ *
+ * - Owner: server
+ * - Source: `["feed", { $stream: true, kind? }]`
+ * - Writable: no
+ * - Mutations & invalidation: none (mutations never invalidate streams)
+ */
+export const feedStreamKey = keyFor(feedStreamSpec, FeedPayload, { stream: true });

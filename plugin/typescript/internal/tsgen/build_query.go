@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
-	"sort"
 	"strings"
 
 	"goa.design/goa/v3/codegen"
@@ -13,8 +12,8 @@ import (
 
 // The TanStack Query layer (ADR 0006): with Meta("typescript:query",
 // "tanstack") on the API, every generated function that reads, streams or
-// writes gets one-line exports in <method>.query.ts that call the runtime's
-// query helpers (runtime/src/query.ts).
+// writes gets one-line exports at the end of its endpoint file that call the
+// runtime's query helpers (runtime/src/query.ts).
 
 const (
 	metaQuery       = "typescript:query"
@@ -152,7 +151,6 @@ func classifyQuery(e *expr.HTTPEndpointExpr, ep *EndpointSpec, svc *ServiceSpec)
 	if err := checkInvalidatesMeta(m, mutation); err != nil {
 		return err
 	}
-	ep.ExportSpec = len(ep.Queries) > 0
 	return nil
 }
 
@@ -298,7 +296,7 @@ type queryRef struct {
 
 // finishQueries runs once every service is built: it resolves the default
 // invalidation of mutations, detects key collisions across services, finds
-// which mutations invalidate which keys, and renders the query files'
+// which mutations invalidate which keys, and renders the query
 // declarations. It returns warnings for `goa gen` to print.
 func finishQueries(services []*ServiceSpec) []string {
 	var (
@@ -397,15 +395,16 @@ func finishQueries(services []*ServiceSpec) []string {
 			if len(ep.Queries) == 0 {
 				continue
 			}
+			// The exports go at the end of the endpoint file, which imports
+			// the helpers they call beside what its functions use.
 			runtime := make(map[string]struct{})
 			for _, q := range ep.Queries {
 				q.Source = keySource(ep, q)
 				q.Decls = queryDecls(ep, q, runtime)
 			}
 			for name := range runtime {
-				ep.QueryImports = append(ep.QueryImports, name)
+				ep.Imports.addRuntime(name)
 			}
-			sort.Strings(ep.QueryImports)
 		}
 	}
 	return warnings

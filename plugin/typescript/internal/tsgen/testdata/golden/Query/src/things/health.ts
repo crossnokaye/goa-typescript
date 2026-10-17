@@ -8,18 +8,14 @@ import {
   type EndpointSpec,
   type GoaError,
   goaErrorDecoder,
+  keyFor,
   type OtherErrorName,
+  queryFor,
   type RequestOptions,
   send,
 } from '../runtime/index.js';
 
-/**
- * healthSpec is the transport mapping of health, for the sibling query file; it is not a
- * public contract.
- *
- * @internal
- */
-export const healthSpec: EndpointSpec = {
+const healthSpec: EndpointSpec = {
   method: 'GET',
   path: '/health',
   pathParams: {},
@@ -57,3 +53,26 @@ export async function health(
   }
   return decodeResponse(sent.value, null, healthResponses, goaErrorDecoder(healthErrors));
 }
+
+/**
+ * healthQuery returns the query options of health, for `useQuery`, `fetchQuery` and the like.
+ * The method has no result: the data is `null`.
+ *
+ * - Owner: server
+ * - Source: `["health"]`
+ * - Writable: no
+ * - Mutations & invalidation: none
+ */
+export const healthQuery = queryFor(health, healthSpec, null, { void: true });
+
+/**
+ * healthKey returns the key of a health request. Without a payload it returns
+ * `["health"]`, an invalidation prefix that matches every health request and is no other
+ * query's key.
+ *
+ * - Owner: server
+ * - Source: `["health"]`
+ * - Writable: no
+ * - Mutations & invalidation: none
+ */
+export const healthKey = keyFor(healthSpec, null);

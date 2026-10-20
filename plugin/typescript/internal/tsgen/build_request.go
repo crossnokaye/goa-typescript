@@ -182,6 +182,9 @@ func (b *builder) buildRequest(e *expr.HTTPEndpointExpr, strip map[string]struct
 		}
 		seen[f.key] = f.name
 	}
+	for _, f := range fields {
+		req.Props = append(req.Props, RequestProp{Key: f.key, Optional: f.optional})
+	}
 	req.TSDef = c.objectTS(fields, "")
 	req.Zod, _ = c.objectZod(fields, "")
 	req.Optional = req.Body.Kind != BodyRaw && allOptional(fields)

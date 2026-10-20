@@ -3,6 +3,7 @@ package tsgen
 import (
 	"fmt"
 	"mime"
+	"slices"
 	"sort"
 	"strings"
 
@@ -97,18 +98,35 @@ func (r *refs) useRuntime(names ...string) {
 
 // imports returns the import lists. Runtime names are sorted ignoring their
 // "type " prefix.
-func (r *refs) imports() Imports {
-	imp := Imports{Zod: r.zod}
-	for n := range r.runtime {
-		imp.Runtime = append(imp.Runtime, n)
-	}
-	sort.Slice(imp.Runtime, func(i, j int) bool {
-		a, b := strings.TrimPrefix(imp.Runtime[i], "type "), strings.TrimPrefix(imp.Runtime[j], "type ")
+// sortRuntimeImports orders runtime import names case-insensitively,
+// ignoring the "type " prefix of type-only names.
+func sortRuntimeImports(names []string) {
+	sort.Slice(names, func(i, j int) bool {
+		a, b := strings.TrimPrefix(names[i], "type "), strings.TrimPrefix(names[j], "type ")
 		if strings.EqualFold(a, b) {
 			return a < b
 		}
 		return strings.ToLower(a) < strings.ToLower(b)
 	})
+}
+
+// addRuntime adds runtime names to the imports of a file built earlier, as
+// refs.useRuntime would have.
+func (imp *Imports) addRuntime(names ...string) {
+	for _, n := range names {
+		if !slices.Contains(imp.Runtime, n) {
+			imp.Runtime = append(imp.Runtime, n)
+		}
+	}
+	sortRuntimeImports(imp.Runtime)
+}
+
+func (r *refs) imports() Imports {
+	imp := Imports{Zod: r.zod}
+	for n := range r.runtime {
+		imp.Runtime = append(imp.Runtime, n)
+	}
+	sortRuntimeImports(imp.Runtime)
 	for n := range r.types {
 		imp.Types = append(imp.Types, n)
 	}

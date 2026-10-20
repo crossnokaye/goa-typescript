@@ -16,3 +16,10 @@ const {{ .ResponsesName }} = {{ .ResponsesTS }};
 
 {{ template "partial_sse_func" (dict "Endpoint" $ "FuncName" .FuncName "SpecName" .SpecName "Doc" $.StreamDoc) }}
 {{- end }}
+{{- range .Queries }}
+{{- range .Decls }}
+
+{{ jsdoc .Doc "" -}}
+{{ .Code }}
+{{- end }}
+{{- end }}

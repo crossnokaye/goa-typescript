@@ -17,3 +17,10 @@ export {};
 //   {{ .Method }}: {{ .Reason }}
 {{- end }}
 {{- end }}
+{{- if .QueryNone }}
+
+// No query options are generated for these methods:
+{{- range .QueryNone }}
+//   {{ .Method }}: {{ .Reason }}
+{{- end }}
+{{- end }}

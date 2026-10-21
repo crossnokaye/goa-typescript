@@ -1683,8 +1683,8 @@ var QueryDSL = func() {
 			})
 		})
 		Method("archive_thing", func() {
-			Description("Invalidates the methods it names.")
-			Meta("typescript:invalidates", "list_things, get_thing, watch_thing")
+			Description("Invalidates the methods it names. Its path has no {thing_id}, so head_thing's key stops at the prefix.")
+			Meta("typescript:invalidates", "get_thing, head_thing, watch_thing")
 			Payload(func() {
 				Attribute("id", String)
 				Required("id")

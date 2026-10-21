@@ -245,6 +245,8 @@ func (s *toyService) UpsertThing(_ context.Context, p *toy.UpsertThingPayload) (
 	return &toy.UpsertResult{Thing: thing, Outcome: ptr("updated")}, nil
 }
 
+func (s *toyService) LabelThing(context.Context, *toy.LabelThingPayload) error { return nil }
+
 func (s *toyService) FindThing(_ context.Context, p *toy.FindThingPayload) (*toy.FindThingResult, error) {
 	if p.Name == "nothing" {
 		// No tag: the untagged 204 response is used.

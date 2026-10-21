@@ -193,6 +193,12 @@ func nameQueries(svc *ServiceSpec, methods map[string]*expr.MethodExpr, names *c
 				q.defaultInvalidation = true
 				continue
 			}
+			params := make(map[string]bool)
+			if ep.Request != nil {
+				for _, p := range ep.Request.Path {
+					params[p.Wire] = true
+				}
+			}
 			for _, name := range strings.Split(v, ",") {
 				name = strings.TrimSpace(name)
 				if name == "" {
@@ -207,14 +213,29 @@ func nameQueries(svc *ServiceSpec, methods map[string]*expr.MethodExpr, names *c
 					return fmt.Errorf("method %q: Meta(%q) names %q, which is not a method of the service",
 						ep.MethodName, metaInvalidates, name)
 				}
+				// A named route is kept whole: invalidatesFor fills its
+				// parameters from the mutation's own path parameters, matched
+				// by name, and stops before the first one it cannot fill.
 				for _, t := range targets {
-					prefix := staticPrefix(t.Path)
-					if prefix == "/" {
-						return fmt.Errorf("method %q: Meta(%q) cannot invalidate %q: its route has no static prefix",
-							ep.MethodName, metaInvalidates, name)
+					prefix, missing := fillablePrefix(t.Path, params)
+					switch {
+					case prefix == "/" && missing == "":
+						return fmt.Errorf("method %q: Meta(%q) cannot invalidate %q: its route is the root, "+
+							"and the empty key would invalidate everything", ep.MethodName, metaInvalidates, name)
+					case prefix == "/":
+						return fmt.Errorf("method %q: Meta(%q) cannot invalidate %q: its route starts with {%s}, "+
+							"which is not a path parameter of %q, and the empty key would invalidate everything",
+							ep.MethodName, metaInvalidates, name, missing, ep.MethodName)
 					}
-					if !slices.Contains(q.Invalidates, prefix) {
-						q.Invalidates = append(q.Invalidates, prefix)
+					if slices.Contains(q.Invalidates, t.Path) {
+						continue
+					}
+					q.Invalidates = append(q.Invalidates, t.Path)
+					if missing != "" {
+						if q.InvalidatesFallback == nil {
+							q.InvalidatesFallback = make(map[string]InvalidationFallback)
+						}
+						q.InvalidatesFallback[t.Path] = InvalidationFallback{Query: name, Param: missing, Prefix: prefix}
 					}
 				}
 			}
@@ -265,6 +286,23 @@ func defaultInvalidation(path string, reads []string) (template string, ok bool)
 		}
 		segs = segs[:len(segs)-1]
 	}
+}
+
+// fillablePrefix is the part of a template whose key a mutation with the
+// path parameters params can build: the segments up to the first one holding
+// a parameter not in params, which missing names ("" when there is none).
+// substitute in runtime/src/query.ts stops at the same place.
+func fillablePrefix(template string, params map[string]bool) (prefix, missing string) {
+	var out []string
+	for _, s := range segments(template) {
+		for _, m := range pathParam.FindAllStringSubmatch(s, -1) {
+			if !params[m[1]] {
+				return "/" + strings.Join(out, "/"), m[1]
+			}
+		}
+		out = append(out, s)
+	}
+	return "/" + strings.Join(out, "/"), ""
 }
 
 // staticPrefix is the path made of the static segments of a route up to its
@@ -342,6 +380,17 @@ func finishQueries(services []*ServiceSpec) []string {
 			warnings = append(warnings, fmt.Sprintf("service %q: mutation %q invalidates no query", w.svc.Name, w.ep.MethodName))
 		}
 	}
+	// A named route the mutation cannot fill in whole falls back to a
+	// shorter key at run time.
+	for _, w := range writes {
+		for _, t := range w.q.Invalidates {
+			if fb, ok := w.q.InvalidatesFallback[t]; ok {
+				warnings = append(warnings, fmt.Sprintf(
+					"service %q: mutation %q has no path parameter {%s} to fill in the route of %q: it invalidates %q instead",
+					w.svc.Name, w.ep.MethodName, fb.Param, fb.Query, fb.Prefix))
+			}
+		}
+	}
 
 	// Collisions: reads with reads and streams with streams, on routes that
 	// are equal once parameter names are ignored. A GET keeps its clean key;
@@ -375,13 +424,16 @@ func finishQueries(services []*ServiceSpec) []string {
 	}
 
 	// Invalidation: a mutation's template invalidates every read key it is a
-	// prefix of.
+	// prefix of, once cut where the mutation cannot fill it.
 	for _, r := range reads {
 		if r.q.Kind != QueryRead {
 			continue
 		}
 		for _, w := range writes {
 			for _, t := range w.q.Invalidates {
+				if fb, ok := w.q.InvalidatesFallback[t]; ok {
+					t = fb.Prefix
+				}
 				if invalidates(t, r.q.Path) {
 					r.q.InvalidatedBy = append(r.q.InvalidatedBy, "`"+ref(r.svc, w, w.q.Name)+"`")
 					break
@@ -598,7 +650,11 @@ func queryDecls(ep *EndpointSpec, q *QuerySpec, runtime map[string]struct{}) []Q
 		line("- Owner: server")
 		var keys []string
 		for _, t := range q.Invalidates {
-			keys = append(keys, "`"+templateKey(ep, t)+"`")
+			key := "`" + templateKey(ep, t) + "`"
+			if fb, ok := q.InvalidatesFallback[t]; ok {
+				key += fmt.Sprintf(" (no path parameter `%s`: stops at `%s`)", fb.Param, templateKey(ep, fb.Prefix))
+			}
+			keys = append(keys, key)
 		}
 		invalidated := strings.Join(keys, ", ")
 		switch {

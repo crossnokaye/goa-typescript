@@ -342,6 +342,21 @@ var _ = Service("toy", func() {
 		})
 	})
 
+	Method("label_thing", func() {
+		Description("Labels a thing. Labels live under their own route, which no read shares, so the method " +
+			"names the read it affects: the key is that thing's, filled in from the id.")
+		Meta("typescript:invalidates", "get_thing")
+		PayloadWithToken(func() {
+			Attribute("id", String)
+			Attribute("label", String)
+			Required("id", "label")
+		})
+		HTTP(func() {
+			PUT("/labels/{id}")
+			Response(StatusNoContent)
+		})
+	})
+
 	Method("find_thing", func() {
 		Description("Answers 200 with the match as the body, or 204 when the name is \"nothing\".")
 		PayloadWithToken(func() {

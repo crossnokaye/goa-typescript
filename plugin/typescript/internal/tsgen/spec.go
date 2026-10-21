@@ -239,6 +239,10 @@ type QuerySpec struct {
 	Collisions []string
 	// Invalidates are the path templates of the keys a mutation invalidates.
 	Invalidates []string
+	// InvalidatesFallback records, by template, the routes named with
+	// Meta("typescript:invalidates") that the mutation cannot fill in whole:
+	// their run-time key stops before the first parameter it lacks.
+	InvalidatesFallback map[string]InvalidationFallback `json:",omitempty"`
 	// InvalidatesNoQuery is true when the default invalidation reaches no
 	// read: `goa gen` warns about it.
 	InvalidatesNoQuery bool `json:",omitempty"`
@@ -253,6 +257,18 @@ type QuerySpec struct {
 	Source string
 	// Decls are the rendered exports: JSDoc and one line of code each.
 	Decls []QueryDecl
+}
+
+// InvalidationFallback describes a named route whose key a mutation cannot
+// fill in whole: `goa gen` warns about it.
+type InvalidationFallback struct {
+	// Query is the method named in Meta("typescript:invalidates").
+	Query string
+	// Param is the first parameter of its route that is not a path
+	// parameter of the mutation.
+	Param string
+	// Prefix is the template of the key the mutation invalidates instead.
+	Prefix string
 }
 
 // QueryDecl is one query export of an endpoint file.

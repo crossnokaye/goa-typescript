@@ -312,6 +312,20 @@ describe('mutations', () => {
     expect(qc.getQueryState(toy.getThingKey({ id: 'other' }))?.isInvalidated).toBe(false);
   });
 
+  it('invalidates the key of the read it names, filled in from its variables', async () => {
+    const qc = queryClient();
+    await qc.fetchQuery(toy.listThingsQuery(client()));
+    await qc.fetchQuery(toy.getThingQuery(client(), { id: 'labelled' }));
+    await qc.fetchQuery(toy.getThingQuery(client(), { id: 'other' }));
+    const options = toy.labelThingMutation(client(), { queryClient: qc });
+    await new MutationObserver(qc, options).mutate({ id: 'labelled', label: 'l' });
+    // PUT /labels/{id} names get_thing: its route, with the mutation's {id}, not its prefix.
+    expect(toy.labelThingInvalidates({ id: 'labelled', label: 'l' })).toEqual([['things', 'labelled']]);
+    expect(qc.getQueryState(toy.getThingKey({ id: 'labelled' }))?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(toy.getThingKey({ id: 'other' }))?.isInvalidated).toBe(false);
+    expect(qc.getQueryState(toy.listThingsKey())?.isInvalidated).toBe(false);
+  });
+
   it('never restarts an open stream', async () => {
     const qc = queryClient();
     const rec = spy();

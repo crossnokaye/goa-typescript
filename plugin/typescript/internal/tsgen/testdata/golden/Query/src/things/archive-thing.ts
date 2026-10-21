@@ -49,7 +49,7 @@ export type ArchiveThingError =
   | ClientError;
 
 /**
- * Invalidates the methods it names.
+ * Invalidates the methods it names. Its path has no {thing_id}, so head_thing's key stops at the prefix.
  *
  * POST /things/{id}/archive
  */
@@ -74,15 +74,15 @@ export async function archiveThing(
  * invalidation by hand.
  *
  * - Owner: server
- * - Invalidates: `["things"]`
+ * - Invalidates: `["things", id]`, `["things", thing_id]` (no path parameter `thing_id`: stops at `["things"]`), `["things", id, "events"]`
  */
-export const archiveThingInvalidates = invalidatesFor(archiveThingSpec, ArchiveThingPayload, ['/things']);
+export const archiveThingInvalidates = invalidatesFor(archiveThingSpec, ArchiveThingPayload, ['/things/{id}', '/things/{thing_id}', '/things/{id}/events']);
 
 /**
  * archiveThingMutation returns the mutation options of archiveThing, for `useMutation`. Given
  * `{ queryClient }`, `onSuccess` invalidates the keys below (never a stream's).
  *
  * - Owner: server
- * - Invalidates: `["things"]`
+ * - Invalidates: `["things", id]`, `["things", thing_id]` (no path parameter `thing_id`: stops at `["things"]`), `["things", id, "events"]`
  */
 export const archiveThingMutation = mutationFor(archiveThing, archiveThingInvalidates);

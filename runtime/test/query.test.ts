@@ -426,6 +426,16 @@ describe('invalidatesFor and mutationFor', () => {
     expect(invalidates()).toEqual([['things'], ['other']]);
   });
 
+  it('fills the route of a named read by the names of the path parameters, stopping at one the mutation lacks', () => {
+    // Meta("typescript:invalidates") emits each named read's route whole.
+    const modeSpec = spec({ method: 'PUT', path: '/sites/{siteId}/mode', pathParams: { site: 'siteId' } });
+    const Mode = z.object({ site: z.string(), planId: z.string() });
+    const invalidates = invalidatesFor(modeSpec, Mode, ['/sites/{siteId}/plan', '/sites/{siteId}', '/plans/{planId}']);
+    // {siteId} is matched by its name in the routes, whatever property holds it; planId is a
+    // body property, not a path parameter, so the last key stops before it.
+    expect(invalidates({ site: 's1', planId: 'p1' })).toEqual([['sites', 's1', 'plan'], ['sites', 's1'], ['plans']]);
+  });
+
   it('invalidates every key on success when given a queryClient, awaiting them all', async () => {
     const invalidates = invalidatesFor(labelSpec, Label, ['/things/{id}/labels', '/things']);
     const del = async (_c: Client, payload: z.output<typeof Label>) => ok(payload.label);

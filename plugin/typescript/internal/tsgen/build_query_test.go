@@ -112,19 +112,28 @@ func TestBuildQueryInvalidation(t *testing.T) {
 	pkg := build(t, testdata.QueryDSL)
 	things := service(t, pkg, "things")
 	for method, want := range map[string][]string{
-		"update_thing":   {"/things"},      // PUT /things/{id}: the trailing parameter goes
-		"delete_label":   {"/things/{id}"}, // no read under /things/{id}/labels: up to get_thing's route
-		"archive_thing":  {"/things"},      // three methods named, one prefix
-		"touch":          nil,              // Meta("typescript:invalidates", "")
-		"upload_content": {"/things/{id}"}, // the raw download under /content is no read
-		"run_job":        {"/jobs"},        // no read at all: the shortest prefix, with a warning
+		"update_thing":   {"/things"},                                                   // PUT /things/{id}: the trailing parameter goes
+		"delete_label":   {"/things/{id}"},                                              // no read under /things/{id}/labels: up to get_thing's route
+		"archive_thing":  {"/things/{id}", "/things/{thing_id}", "/things/{id}/events"}, // the named routes, whole
+		"touch":          nil,                                                           // Meta("typescript:invalidates", "")
+		"upload_content": {"/things/{id}"},                                              // the raw download under /content is no read
+		"run_job":        {"/jobs"},                                                     // no read at all: the shortest prefix, with a warning
 	} {
 		ep := endpoint(t, things, method)
 		wantEqual(t, method, ep.Queries[0].Invalidates, want)
 	}
 	wantEqual(t, "no query", query(t, endpoint(t, things, "run_job"), "runJob").InvalidatesNoQuery, true)
 	wantEqual(t, "a query", query(t, endpoint(t, things, "delete_label"), "deleteLabel").InvalidatesNoQuery, false)
-	wantEqual(t, "warnings", pkg.Warnings, []string{`service "things": mutation "run_job" invalidates no query`})
+	archive := query(t, endpoint(t, things, "archive_thing"), "archiveThing")
+	wantEqual(t, "fallback", archive.InvalidatesFallback, map[string]InvalidationFallback{
+		"/things/{thing_id}": {Query: "head_thing", Param: "thing_id", Prefix: "/things"},
+	})
+	wantEqual(t, "warnings", pkg.Warnings, []string{
+		`service "things": mutation "run_job" invalidates no query`,
+		`service "things": mutation "archive_thing" has no path parameter {thing_id} to fill in the route of "head_thing": it invalidates "/things" instead`,
+	})
+	wantEqual(t, "list invalidated through the fallback", query(t, endpoint(t, things, "list_things"), "listThings").InvalidatedBy,
+		[]string{"`updateThingMutation`", "`archiveThingMutation`"})
 
 	get := query(t, endpoint(t, things, "get_thing"), "getThing")
 	wantEqual(t, "invalidated by", get.InvalidatedBy, []string{
@@ -138,6 +147,124 @@ func TestBuildQueryInvalidation(t *testing.T) {
 	wantEqual(t, "streams are never invalidated", query(t, endpoint(t, things, "watch_thing"), "watchThing").InvalidatedBy,
 		[]string(nil))
 	wantEqual(t, "prefix", staticPrefix("/things/{id}/labels"), "/things")
+}
+
+func TestBuildQueryNamedInvalidation(t *testing.T) {
+	site := func() {
+		Attribute("site_id", String)
+		Required("site_id")
+	}
+	pkg := build(t, func() {
+		API("api", func() { Meta("typescript:query", "tanstack") })
+		Service("svc", func() {
+			Method("list_sites", func() {
+				Result(ArrayOf(String))
+				HTTP(func() { GET("/sites") })
+			})
+			Method("get_mode", func() {
+				Payload(site)
+				Result(String)
+				HTTP(func() { GET("/sites/{site_id}/mode") })
+			})
+			Method("get_plan", func() {
+				Payload(site)
+				Result(String)
+				HTTP(func() { GET("/sites/{site_id}/plan") })
+			})
+			Method("get_tenant", func() {
+				Payload(func() {
+					Attribute("tenant", String)
+					Required("tenant")
+				})
+				Result(String)
+				HTTP(func() { GET("/{tenant}") })
+			})
+			// The mode puts a plan in force: both reads of the site, and
+			// no other site's.
+			Method("set_mode", func() {
+				Meta("typescript:invalidates", "get_mode, get_plan, get_mode")
+				Payload(func() {
+					Attribute("site_id", String)
+					Attribute("mode", String)
+					Required("site_id", "mode")
+				})
+				HTTP(func() { PUT("/sites/{site_id}/mode") })
+			})
+			// site_id is in the body, not the path: the key stops at the
+			// static prefix.
+			Method("import_plan", func() {
+				Meta("typescript:invalidates", "get_plan")
+				Payload(func() {
+					Attribute("site_id", String)
+					Required("site_id")
+				})
+				HTTP(func() { POST("/imports") })
+			})
+			// A route that starts with a parameter the mutation fills in.
+			Method("purge_tenant", func() {
+				Meta("typescript:invalidates", "get_tenant")
+				Payload(func() {
+					Attribute("tenant", String)
+					Required("tenant")
+				})
+				HTTP(func() { DELETE("/{tenant}/cache") })
+			})
+		})
+	})
+	svc := service(t, pkg, "svc")
+
+	set := query(t, endpoint(t, svc, "set_mode"), "setMode")
+	wantEqual(t, "set_mode", set.Invalidates, []string{"/sites/{site_id}/mode", "/sites/{site_id}/plan"})
+	wantEqual(t, "set_mode fallback", set.InvalidatesFallback, map[string]InvalidationFallback(nil))
+	wantEqual(t, "set_mode code", set.Decls[0].Code,
+		`export const setModeInvalidates = invalidatesFor(setModeSpec, SetModePayload, ['/sites/{site_id}/mode', '/sites/{site_id}/plan']);`)
+	if !strings.Contains(set.Decls[0].Doc, "- Invalidates: `[\"sites\", site_id, \"mode\"]`, `[\"sites\", site_id, \"plan\"]`") {
+		t.Errorf("set_mode card:\n%s", set.Decls[0].Doc)
+	}
+
+	imp := query(t, endpoint(t, svc, "import_plan"), "importPlan")
+	wantEqual(t, "import_plan", imp.Invalidates, []string{"/sites/{site_id}/plan"})
+	wantEqual(t, "import_plan fallback", imp.InvalidatesFallback, map[string]InvalidationFallback{
+		"/sites/{site_id}/plan": {Query: "get_plan", Param: "site_id", Prefix: "/sites"},
+	})
+	if !strings.Contains(imp.Decls[0].Doc,
+		"- Invalidates: `[\"sites\", site_id, \"plan\"]` (no path parameter `site_id`: stops at `[\"sites\"]`)") {
+		t.Errorf("import_plan card:\n%s", imp.Decls[0].Doc)
+	}
+
+	purge := query(t, endpoint(t, svc, "purge_tenant"), "purgeTenant")
+	wantEqual(t, "purge_tenant", purge.Invalidates, []string{"/{tenant}"})
+
+	wantEqual(t, "warnings", pkg.Warnings, []string{
+		`service "svc": mutation "import_plan" has no path parameter {site_id} to fill in the route of "get_plan": it invalidates "/sites" instead`,
+	})
+	// A read is invalidated by the key the mutation builds: the static
+	// prefix when it falls back.
+	for method, want := range map[string][]string{
+		"list_sites": {"`importPlanMutation`"},
+		"get_mode":   {"`setModeMutation`", "`importPlanMutation`"},
+		"get_plan":   {"`setModeMutation`", "`importPlanMutation`"},
+		"get_tenant": {"`purgeTenantMutation`"},
+	} {
+		ep := endpoint(t, svc, method)
+		wantEqual(t, method+" invalidated by", ep.Queries[0].InvalidatedBy, want)
+	}
+}
+
+func TestFillablePrefix(t *testing.T) {
+	params := map[string]bool{"id": true, "path": true}
+	for _, c := range []struct{ template, prefix, missing string }{
+		{"/things/{id}", "/things/{id}", ""},
+		{"/things/{id}/labels/{lid}", "/things/{id}/labels", "lid"},
+		{"/things/{thing_id}", "/things", "thing_id"},
+		{"/files/{*path}", "/files/{*path}", ""},
+		{"/files/{id}.{ext}", "/files", "ext"}, // a segment is filled in whole or not at all
+		{"/{org}/things", "/", "org"},
+		{"/", "/", ""},
+	} {
+		prefix, missing := fillablePrefix(c.template, params)
+		wantEqual(t, c.template, []string{prefix, missing}, []string{c.prefix, c.missing})
+	}
 }
 
 func TestDefaultInvalidationWalksToARead(t *testing.T) {
@@ -345,7 +472,7 @@ func TestBuildQueryErrors(t *testing.T) {
 				Method("reset", func() { HTTP(func() { POST("/reset") }) })
 			})
 		}, `names "reset", which has no query options`},
-		"invalidates a route without a static prefix": {func() {
+		"invalidates a route that starts with a parameter the mutation lacks": {func() {
 			enable()
 			Service("svc", func() {
 				Method("get", func() {
@@ -360,7 +487,17 @@ func TestBuildQueryErrors(t *testing.T) {
 					HTTP(func() { POST("/set") })
 				})
 			})
-		}, `cannot invalidate "get": its route has no static prefix`},
+		}, `cannot invalidate "get": its route starts with {id}, which is not a path parameter of "set"`},
+		"invalidates the root": {func() {
+			enable()
+			Service("svc", func() {
+				Method("get", func() { HTTP(func() { GET("/") }) })
+				Method("set", func() {
+					Meta("typescript:invalidates", "get")
+					HTTP(func() { POST("/set") })
+				})
+			})
+		}, `cannot invalidate "get": its route is the root`},
 		"invalidates on a query": {func() {
 			enable()
 			Service("svc", func() {

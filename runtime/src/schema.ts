@@ -27,9 +27,13 @@ export function date() {
   return z.iso.date();
 }
 
-/** bytes maps goa `Bytes` (standard base64 in JSON) to `Uint8Array`. */
+/**
+ * bytes maps goa `Bytes` (standard base64 in JSON) to `Uint8Array`. The value is typed as plain
+ * `Uint8Array`, as the generated types declare it, so encoding accepts a view over any buffer.
+ */
 export function bytes() {
-  return z.codec(z.base64(), z.instanceof(Uint8Array), {
+  const array: z.ZodType<Uint8Array, Uint8Array> = z.instanceof(Uint8Array);
+  return z.codec(z.base64(), array, {
     decode: (text) => base64ToBytes(text),
     encode: (value) => bytesToBase64(value),
   });
@@ -64,9 +68,10 @@ export function any() {
  * nullAsAbsent wraps the schema of an optional attribute that goa serializes
  * as `null` when unset (a `struct:tag:json` override without `omitempty`).
  * Decoding treats `null` as absent; encoding omits the value.
+ * The type arguments are explicit because TypeScript 7 does not infer them here.
  */
 export function nullAsAbsent<T extends z.ZodType>(schema: T) {
-  return z.codec(z.unknown(), schema.optional(), {
+  return z.codec<z.ZodUnknown, z.ZodOptional<T>>(z.unknown(), schema.optional(), {
     decode: (value) => (value ?? undefined) as z.input<T> | undefined,
     encode: (value) => value,
   });
@@ -446,7 +451,7 @@ function isRecordWithMessage(value: unknown): value is { message: string } {
   );
 }
 
-function base64ToBytes(text: string): Uint8Array {
+function base64ToBytes(text: string): Uint8Array<ArrayBuffer> {
   const binary = atob(text);
   const out = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {

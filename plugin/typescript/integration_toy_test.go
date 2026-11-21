@@ -14,10 +14,6 @@ import (
 	"time"
 )
 
-// goaVersion is the goa release the repository pins; the generator binary
-// must match the module version or it fails to compile.
-const goaVersion = "v3.35.0"
-
 // toyToken is the credential the toy server is told to accept.
 const toyToken = "toy-token"
 
@@ -42,7 +38,10 @@ func TestToyExample_GenerateAndRun(t *testing.T) {
 
 	toy := filepath.Join(mustRepoRoot(t), "examples", "toy")
 
-	// Generate code into the toy module using the standard Goa tool.
+	// Generate code into the toy module using the standard Goa tool, at the
+	// goa version the toy module resolves: the generator binary must match it
+	// or it fails to compile.
+	goaVersion := strings.TrimSpace(output(t, toy, "go", "list", "-m", "-f", "{{.Version}}", "goa.design/goa/v3"))
 	run(t, toy, nil, "go", "run", "goa.design/goa/v3/cmd/goa@"+goaVersion, "gen",
 		"github.com/crossnokaye/goa-typescript/examples/toy/design", "-o", ".")
 
@@ -192,6 +191,27 @@ func mustRepoRoot(t *testing.T) string {
 
 func run(t *testing.T, dir string, env []string, exe string, args ...string) {
 	t.Helper()
+	cmd := command(dir, env, exe, args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("command failed: %s %s\n%s\n%v", exe, strings.Join(args, " "), string(out), err)
+	}
+}
+
+// output runs a command like run and returns its standard output.
+func output(t *testing.T, dir string, exe string, args ...string) string {
+	t.Helper()
+	cmd := command(dir, nil, exe, args...)
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("command failed: %s %s\n%s\n%v", exe, strings.Join(args, " "), stderr.String(), err)
+	}
+	return string(out)
+}
+
+func command(dir string, env []string, exe string, args ...string) *exec.Cmd {
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(),
@@ -199,8 +219,5 @@ func run(t *testing.T, dir string, env []string, exe string, args ...string) {
 		"GOWORK=off",
 	)
 	cmd.Env = append(cmd.Env, env...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("command failed: %s %s\n%s\n%v", exe, strings.Join(args, " "), string(out), err)
-	}
+	return cmd
 }

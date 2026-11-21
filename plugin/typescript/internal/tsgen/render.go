@@ -190,7 +190,7 @@ func packageJSON(pkg *PackageSpec) string {
 		},
 		Scripts:          map[string]string{"type-check": "tsc --noEmit"},
 		PeerDependencies: map[string]string{"zod": "^4.1.0"},
-		DevDependencies:  map[string]string{"typescript": "^5.6.2", "zod": "^4.1.0"},
+		DevDependencies:  map[string]string{"typescript": "^5.7.0", "zod": "^4.1.0"},
 	}
 	var b bytes.Buffer
 	enc := json.NewEncoder(&b)

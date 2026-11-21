@@ -11,7 +11,7 @@ The generated client is functional (`fn(client, payload?, options?)`), returns `
 
 ### Try it on a service (minimal)
 
-`goa-typescript` targets Goa `v3.34.x` (Go 1.26+). The generated code needs TypeScript 5.6+ and `zod` `^4.1.0`.
+`goa-typescript` targets Goa `v3.34.x` (Go 1.26+). The generated code needs TypeScript 5.7+ and `zod` `^4.1.0`.
 
 The Goa plugin model is: your plugin must be linked into the generator binary that runs during `goa gen` ([plugin guide](https://pkg.go.dev/goa.design/plugins/v3)).
 

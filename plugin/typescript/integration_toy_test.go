@@ -16,7 +16,7 @@ import (
 
 // goaVersion is the goa release the repository pins; the generator binary
 // must match the module version or it fails to compile.
-const goaVersion = "v3.34.0"
+const goaVersion = "v3.35.0"
 
 // toyToken is the credential the toy server is told to accept.
 const toyToken = "toy-token"

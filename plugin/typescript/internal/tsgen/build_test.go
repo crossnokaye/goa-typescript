@@ -55,7 +55,7 @@ func wantEqual(t *testing.T, what string, got, want any) {
 func TestBuildPackageMetadata(t *testing.T) {
 	pkg := build(t, testdata.SSEStringDSL)
 	wantEqual(t, "name", pkg.Name, "test-api-client")
-	wantEqual(t, "goa version", pkg.GoaVersion, "v3.34.0")
+	wantEqual(t, "goa version", pkg.GoaVersion, "v3.35.0")
 	if len(pkg.Runtime) != len(tsruntime.Sorted()) {
 		t.Errorf("runtime: got %d files, want %d", len(pkg.Runtime), len(tsruntime.Sorted()))
 	}

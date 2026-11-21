@@ -11,7 +11,7 @@ The generated client is functional (`fn(client, payload?, options?)`), returns `
 
 ### Try it on a service (minimal)
 
-`goa-typescript` targets Goa `v3.34.x` (Go 1.26+). The generated code needs TypeScript 5.7+ and `zod` `^4.1.0`.
+`goa-typescript` targets Goa `v3.35.x` (Go 1.27.3+). The generated code needs TypeScript 5.7+ and `zod` `^4.1.0`.
 
 The Goa plugin model is: your plugin must be linked into the generator binary that runs during `goa gen` ([plugin guide](https://pkg.go.dev/goa.design/plugins/v3)).
 
@@ -29,8 +29,8 @@ import _ "github.com/crossnokaye/goa-typescript/plugin/typescript"
 #   "not enough arguments in call to generator.Generate"
 # it means your installed `goa` binary is older/newer than the module.
 #
-# This repo pins goa to v3.34.0, so this is a safe invocation:
-go run goa.design/goa/v3/cmd/goa@v3.34.0 gen <design-import-path> -o .
+# This repo pins goa to v3.35.0, so this is a safe invocation:
+go run goa.design/goa/v3/cmd/goa@v3.35.0 gen <design-import-path> -o .
 # or, if your module declares goa as a tool:
 go tool goa gen <design-import-path> -o .
 ```
@@ -546,6 +546,5 @@ The generated package is meant to be a workspace member consumed as source:
 
 ### Roadmap
 
-- **Multipart requests and file servers.**
-
-Until then the service barrel lists the methods it skipped, and their types and schemas are generated all the same.
+- **Multipart requests and file servers.** Until then the service barrel lists the methods it skipped, and their types and schemas are generated all the same.
+- **Union JSON mappings and HTTP body field names** (`Meta("oneof:json:flatten")`, `Meta("oneof:json:untagged")`, `BodyFieldName`). Until then generation fails on a service that uses them; `Meta("typescript:generate", "false")` on the service leaves it out of the client.

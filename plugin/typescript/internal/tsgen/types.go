@@ -53,6 +53,9 @@ type typeMapper struct {
 	requests map[decl]string
 	// warnings are remarks about metadata the mapper cannot honour.
 	warnings []string
+	// unsupported describes the collected unions whose JSON mapping the
+	// generated client cannot represent.
+	unsupported []string
 }
 
 // newTypeMapper returns a mapper that hoists the types declared by the roots.
@@ -233,6 +236,7 @@ func (m *typeMapper) collect(att *expr.AttributeExpr) {
 				walk(nat.Attribute, nat.Name, true)
 			}
 		case *expr.Union:
+			m.checkUnion(t)
 			for _, nat := range t.Values {
 				walk(nat.Attribute, nat.Name, true)
 			}
@@ -242,6 +246,27 @@ func (m *typeMapper) collect(att *expr.AttributeExpr) {
 	// attribute in its own right.
 	_, wrapped := att.Type.(expr.UserType)
 	walk(att, "", !wrapped)
+}
+
+// checkUnion records a union whose JSON mapping the generated client cannot
+// represent: it only writes and reads the tagged envelope.
+func (m *typeMapper) checkUnion(u *expr.Union) {
+	var key string
+	switch {
+	case u.Untagged:
+		key = "oneof:json:untagged"
+	case u.Flatten:
+		key = "oneof:json:flatten"
+	default:
+		return
+	}
+	msg := fmt.Sprintf("OneOf %q: Meta(%q) is not supported", u.TypeName, key)
+	for _, prior := range m.unsupported {
+		if prior == msg {
+			return
+		}
+	}
+	m.unsupported = append(m.unsupported, msg)
 }
 
 // collectNamed hoists an attribute that Meta("typescript:name") names, when

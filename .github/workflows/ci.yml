@@ -3,8 +3,11 @@ name: CI
 on:
   push:
     branches:
-      - main
+      - v0
   pull_request:
+  # The ceiling moves when a dependency releases, not when the code does.
+  schedule:
+    - cron: "0 14 * * 1"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -59,25 +62,13 @@ jobs:
       - name: Type-check
         run: pnpm -r type-check
 
-  # Generated clients ask for `typescript ^5.7.0` and `zod ^4.1.0`, and
-  # consumers also run newer majors. Type-check the runtime and compile every
-  # golden fixture on the oldest supported releases together and on the latest
-  # TypeScript; the floor also runs the runtime tests.
-  compat:
-    name: compat (${{ matrix.name }})
+  # Run the whole suite on the oldest releases the project admits. Go and goa
+  # are already at their floor: `go.mod` names it. TypeScript and zod are the
+  # generated package's ranges (`>=5.7.0`, `^4.1.0`); TanStack Query 5.86 is the
+  # README's floor for the generated query options.
+  floor:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: typescript 5.7.3, zod 4.1
-            packages: typescript@5.7.3 zod@~4.1.0
-            test: true
-          - name: typescript latest
-            packages: typescript@latest
-            test: false
 
     steps:
       - name: Check out repository
@@ -88,6 +79,9 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+          cache-dependency-path: |
+            go.sum
+            examples/toy/go.sum
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v6.1.1
@@ -101,18 +95,86 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install ${{ matrix.packages }}
-        run: pnpm --filter @goa-typescript/runtime add --save-dev ${{ matrix.packages }}
+      - name: Lower the runtime to the floor
+        run: |
+          pnpm --filter @goa-typescript/runtime add --save-dev typescript@5.7.3 zod@4.1.0
+          pnpm --filter @goa-typescript/runtime list typescript zod
 
-      - name: Type-check the runtime
+      - name: Lower the toy to the floor
+        working-directory: examples/toy
+        run: |
+          sed -i -e 's/^  typescript: .*/  typescript: 5.7.3/' -e 's/^  zod: .*/  zod: 4.1.0/' pnpm-workspace.yaml
+          echo "  '@tanstack/query-core': 5.86.0" >> pnpm-workspace.yaml
+          cat pnpm-workspace.yaml
+
+      - name: Type-check
         run: pnpm -r type-check
 
-      - name: Type-check the golden fixtures
-        run: go test -count=1 -run TestFixturesTypeCheck ./plugin/typescript/internal/tsgen
+      - name: Run runtime tests
+        run: pnpm -r test
+
+      - name: Run tests
+        run: go test ./...
+
+  # Run the whole suite on the newest releases the project admits: Go, goa
+  # and every Go module, Node, TypeScript, zod 4 and TanStack Query 5.
+  ceiling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          check-latest: true
+          cache: false
+
+      - name: Raise the Go modules to the ceiling
+        run: |
+          go get -u -t ./... && go mod tidy
+          cd examples/toy && go get -u -t ./... && go mod tidy
+          go list -m goa.design/goa/v3
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6.1.1
+
+      # setup-node's `current` can resolve to a prerelease.
+      - name: Find the newest Node release
+        id: node
+        run: echo "version=$(curl -fsSL https://nodejs.org/dist/index.json | jq -r '[.[] | select(.version | contains("-") | not)][0].version')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node.outputs.version }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Raise the runtime to the ceiling
+        run: |
+          pnpm --filter @goa-typescript/runtime add --save-dev typescript@latest 'zod@^4.1.0'
+          pnpm --filter @goa-typescript/runtime list typescript zod
+
+      - name: Raise the toy to the ceiling
+        working-directory: examples/toy
+        run: |
+          sed -i -e "s/^  typescript: .*/  typescript: '>=5.7.0'/" -e "s/^  zod: .*/  zod: ^4.1.0/" pnpm-workspace.yaml
+          echo "  '@tanstack/query-core': ^5.86.0" >> pnpm-workspace.yaml
+          cat pnpm-workspace.yaml
+
+      - name: Type-check
+        run: pnpm -r type-check
 
       - name: Run runtime tests
-        if: matrix.test
         run: pnpm -r test
+
+      - name: Run tests
+        run: go test ./...
 
   test:
     runs-on: ubuntu-latest

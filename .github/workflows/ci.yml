@@ -59,18 +59,25 @@ jobs:
       - name: Type-check
         run: pnpm -r type-check
 
-  # Generated clients ask for `typescript ^5.7.0`, and consumers also run newer
-  # majors. Type-check the runtime and compile every golden fixture on the
-  # oldest supported release and on the latest one.
-  type-check-typescript:
-    name: type-check (typescript ${{ matrix.typescript }})
+  # Generated clients ask for `typescript ^5.7.0` and `zod ^4.1.0`, and
+  # consumers also run newer majors. Type-check the runtime and compile every
+  # golden fixture on the oldest supported releases together and on the latest
+  # TypeScript; the floor also runs the runtime tests.
+  compat:
+    name: compat (${{ matrix.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     strategy:
       fail-fast: false
       matrix:
-        typescript: ['5.7.3', 'latest']
+        include:
+          - name: typescript 5.7.3, zod 4.1
+            packages: typescript@5.7.3 zod@~4.1.0
+            test: true
+          - name: typescript latest
+            packages: typescript@latest
+            test: false
 
     steps:
       - name: Check out repository
@@ -94,8 +101,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install TypeScript ${{ matrix.typescript }}
-        run: pnpm --filter @goa-typescript/runtime add --save-dev typescript@${{ matrix.typescript }}
+      - name: Install ${{ matrix.packages }}
+        run: pnpm --filter @goa-typescript/runtime add --save-dev ${{ matrix.packages }}
 
       - name: Type-check the runtime
         run: pnpm -r type-check
@@ -103,44 +110,9 @@ jobs:
       - name: Type-check the golden fixtures
         run: go test -count=1 -run TestFixturesTypeCheck ./plugin/typescript/internal/tsgen
 
-  # Generated clients ask for `zod ^4.1.0`, while the repo pins the latest zod.
-  # Run the runtime tests and compile every golden fixture on the oldest
-  # supported release.
-  zod-floor:
-    name: test (zod 4.1)
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6.1.1
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .tool-versions
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Install zod 4.1
-        run: pnpm --filter @goa-typescript/runtime add --save-dev zod@~4.1.0
-
-      - name: Type-check and test the runtime
-        run: pnpm -r type-check && pnpm -r test
-
-      - name: Type-check the golden fixtures
-        run: go test -count=1 -run TestFixturesTypeCheck ./plugin/typescript/internal/tsgen
+      - name: Run runtime tests
+        if: matrix.test
+        run: pnpm -r test
 
   test:
     runs-on: ubuntu-latest

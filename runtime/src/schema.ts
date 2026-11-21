@@ -71,10 +71,14 @@ export function any() {
  * The type arguments are explicit because TypeScript 7 does not infer them here.
  */
 export function nullAsAbsent<T extends z.ZodType>(schema: T) {
-  return z.codec<z.ZodUnknown, z.ZodOptional<T>>(z.unknown(), schema.optional(), {
-    decode: (value) => (value ?? undefined) as z.input<T> | undefined,
-    encode: (value) => value,
-  });
+  // The outer optional() keeps the key optional in an object: zod does not
+  // derive that from the codec's unknown input.
+  return z
+    .codec<z.ZodUnknown, z.ZodOptional<T>>(z.unknown(), schema.optional(), {
+      decode: (value) => (value ?? undefined) as z.input<T> | undefined,
+      encode: (value) => value,
+    })
+    .optional();
 }
 
 /** ErrorResultSchema validates goa's default error body. */

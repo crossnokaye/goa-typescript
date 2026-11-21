@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "toy-client": "workspace:*",
-    "zod": "4.1.13"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@tanstack/query-core": "5.104.3",

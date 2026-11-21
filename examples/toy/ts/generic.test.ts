@@ -72,7 +72,7 @@ describe('one call shape', () => {
     expectTypeOf(toy.streamCountSse).parameter(1).toEqualTypeOf<undefined>();
     expectTypeOf(toy.streamViewedSse).parameter(1).toEqualTypeOf<toy.StreamViewedSsePayload | undefined>();
     expectTypeOf(toy.listThings).parameters.toEqualTypeOf<
-      [client: Client, payload?: undefined, options?: RequestOptions]
+      [client: Client, payload?: undefined, options?: RequestOptions | undefined]
     >();
     // @ts-expect-error the options are not a payload
     void toy.listThings(client(), { signal: AbortSignal.timeout(1) });
@@ -119,7 +119,7 @@ describe('one call shape', () => {
 
   it('keeps the raw-body shape, with the body after the payload', async () => {
     expectTypeOf(toy.uploadThing).parameters.toEqualTypeOf<
-      [client: Client, payload: toy.UploadThingPayload, body: BodyInit, options?: RequestOptions]
+      [client: Client, payload: toy.UploadThingPayload, body: BodyInit, options?: RequestOptions | undefined]
     >();
     const uploaded = await unwrapAsync(toy.uploadThing(client(), { id: 'abc' }, 'bytes'));
     expect(uploaded.size).toBe(5);

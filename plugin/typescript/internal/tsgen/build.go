@@ -69,6 +69,9 @@ func Build(roots []*expr.RootExpr, opts Options) (*PackageSpec, error) {
 				continue
 			}
 			seen[svc.Name()] = struct{}{}
+			if len(svc.BodyFieldNames) > 0 {
+				return nil, fmt.Errorf("service %q: BodyFieldName is not supported", svc.Name())
+			}
 			services = append(services, service{root: root, http: svc})
 		}
 	}
@@ -96,6 +99,10 @@ func Build(roots []*expr.RootExpr, opts Options) (*PackageSpec, error) {
 				}
 			}
 		}
+	}
+	if len(b.mapper.unsupported) > 0 {
+		sort.Strings(b.mapper.unsupported)
+		return nil, fmt.Errorf("%s", strings.Join(b.mapper.unsupported, "; "))
 	}
 	typeScope := newScope(b.reserved)
 	b.mapper.assignNames(typeScope)

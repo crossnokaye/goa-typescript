@@ -6,7 +6,7 @@ It is a Go module of its own (`github.com/crossnokaye/goa-typescript/examples/to
 
 ### What it proves
 
-- `go run goa.design/goa/v3/cmd/goa@v3.34.0 gen ...` generates normal Goa `gen/` output **plus** `gen/ts`, a TypeScript package named `toy-client` (because the design blank-imports the plugin).
+- `go run goa.design/goa/v3/cmd/goa@v3.35.0 gen ...` generates normal Goa `gen/` output **plus** `gen/ts`, a TypeScript package named `toy-client` (because the design blank-imports the plugin).
 - The generated client **compiles** under TypeScript 5.6.2 with `strict` and `exactOptionalPropertyTypes`.
 - Against the real goa server in `cmd/toy`, the vitest suite in `ts/` shows that:
   - every type feature round-trips: dates, bytes, enums, defaults, unions, recursion, views, a renamed JSON key and the `null` goa sends for it; an inline enum named with `Meta("typescript:name")` is a type and schema of its own, and the request-side `ThingRequest` lets a request leave a nested defaulted attribute out for the server to fill in;
@@ -25,8 +25,8 @@ It is a Go module of its own (`github.com/crossnokaye/goa-typescript/examples/to
 From this directory:
 
 ```bash
-# Use a Goa CLI version compatible with the repo (this repo pins goa to v3.34.0).
-go run goa.design/goa/v3/cmd/goa@v3.34.0 gen github.com/crossnokaye/goa-typescript/examples/toy/design -o .
+# Use a Goa CLI version compatible with the repo (this repo pins goa to v3.35.0).
+go run goa.design/goa/v3/cmd/goa@v3.35.0 gen github.com/crossnokaye/goa-typescript/examples/toy/design -o .
 pnpm install --no-frozen-lockfile
 pnpm type-check
 

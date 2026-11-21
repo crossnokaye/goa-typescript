@@ -41,7 +41,7 @@ The UIs use a small slice of what Speakeasy emits: standalone functions `(core, 
 
 ### Negative / breaking
 
-- Consumers need Goa `v3.34` or later (the plugin compiles against that version's `expr` package) and `zod` `^4.1.0`.
+- Consumers need Goa `v3.35` or later (the plugin compiles against that version's `expr` package) and `zod` `^4.1.0`.
 - Migrating from the Speakeasy SDK changes property names to the wire's snake_case and error types from a generic SDK error to per-function unions.
 - Until REST lands, a consumer runs two SDKs side by side.
 - 64-bit integers past 2^53 cannot be represented; they fail validation.

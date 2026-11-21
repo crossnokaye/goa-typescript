@@ -1,15 +1,9 @@
 {
   "name": "goa-typescript-toy",
   "private": true,
-  "packageManager": "pnpm@10.34.5",
+  "packageManager": "pnpm@12.21.0",
   "scripts": {
     "test": "pnpm --filter toy-e2e test",
     "type-check": "pnpm --filter toy-e2e type-check"
-  },
-  "pnpm": {
-    "overrides": {
-      "typescript": "5.9.3",
-      "zod": "4.6.6"
-    }
   }
 }

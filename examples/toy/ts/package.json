@@ -10,12 +10,12 @@
   },
   "dependencies": {
     "toy-client": "workspace:*",
-    "zod": "4.6.6"
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@tanstack/query-core": "5.104.3",
+    "@tanstack/query-core": "5.108.1",
     "@types/node": "24.19.2",
-    "typescript": "5.9.3",
-    "vitest": "4.1.11"
+    "typescript": "7.0.2",
+    "vitest": "5.1.1"
   }
 }

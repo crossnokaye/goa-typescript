@@ -45,7 +45,7 @@ jobs:
         run: go vet ./design/...
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6.1.1
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -83,7 +83,7 @@ jobs:
           cache: true
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6.1.1
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -99,6 +99,45 @@ jobs:
 
       - name: Type-check the runtime
         run: pnpm -r type-check
+
+      - name: Type-check the golden fixtures
+        run: go test -count=1 -run TestFixturesTypeCheck ./plugin/typescript/internal/tsgen
+
+  # Generated clients ask for `zod ^4.1.0`, while the repo pins the latest zod.
+  # Run the runtime tests and compile every golden fixture on the oldest
+  # supported release.
+  zod-floor:
+    name: test (zod 4.1)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6.1.1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .tool-versions
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install zod 4.1
+        run: pnpm --filter @goa-typescript/runtime add --save-dev zod@~4.1.0
+
+      - name: Type-check and test the runtime
+        run: pnpm -r type-check && pnpm -r test
 
       - name: Type-check the golden fixtures
         run: go test -count=1 -run TestFixturesTypeCheck ./plugin/typescript/internal/tsgen
@@ -121,7 +160,7 @@ jobs:
             examples/toy/go.sum
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6.1.1
 
       - name: Set up Node
         uses: actions/setup-node@v4

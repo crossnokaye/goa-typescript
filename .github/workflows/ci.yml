@@ -117,7 +117,8 @@ jobs:
         run: go test ./...
 
   # Run the whole suite on the newest releases the project admits: Go, goa
-  # and every Go module, Node, TypeScript, zod 4 and TanStack Query 5.
+  # and every Go module, TypeScript, zod 4 and TanStack Query 5. Node is
+  # tooling here, pinned to the newest LTS in `.tool-versions`.
   ceiling:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -142,15 +143,10 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v6.1.1
 
-      # setup-node's `current` can resolve to a prerelease.
-      - name: Find the newest Node release
-        id: node
-        run: echo "version=$(curl -fsSL https://nodejs.org/dist/index.json | jq -r '[.[] | select(.version | contains("-") | not)][0].version')" >> "$GITHUB_OUTPUT"
-
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ steps.node.outputs.version }}
+          node-version-file: .tool-versions
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

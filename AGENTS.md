@@ -18,7 +18,7 @@ go vet ./... && go test ./...                        # generator tests and the t
 go test ./plugin/typescript/internal/tsgen -update   # rewrite the golden files after an intentional change
 ```
 
-- `go test ./...` runs the toy pipeline (gen -> pnpm install -> tsc -> Go server -> vitest), which needs Node 24 and pnpm 12, and compiles every golden fixture with `tsc`, which needs `pnpm install` at the repository root. Both skip when their tools are missing, except in CI. `go test -short ./...` skips them always.
+- `go test ./...` runs the toy pipeline (gen -> pnpm install -> tsc -> Go server -> vitest), which needs Node 26 and pnpm 12, and compiles every golden fixture with `tsc`, which needs `pnpm install` at the repository root. Both skip when their tools are missing, except in CI. `go test -short ./...` skips them always.
 - `runtime/src/*.ts` is embedded into the Go module and copied verbatim into generated clients. Those files may import only each other (with a `.js` suffix) and `zod`.
 - The plugin reads `goa.design/goa/v3/expr` only and must never mutate the design: goa fails `goa gen` if a plugin does. `TestBuildDoesNotMutateDesign` enforces it.
 - Go tests use the standard library `testing` package only. Tests that evaluate a DSL must not call `t.Parallel`.

@@ -96,7 +96,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Lower the runtime to the floor
-        run: pnpm --filter @goa-typescript/runtime add --save-dev typescript@5.7.3 zod@4.1.0
+        run: |
+          pnpm --filter @goa-typescript/runtime add --save-dev typescript@5.7.3 zod@4.1.0
+          pnpm --filter @goa-typescript/runtime list typescript zod
 
       - name: Lower the toy to the floor
         working-directory: examples/toy
@@ -140,16 +142,23 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v6.1.1
 
+      # setup-node's `current` can resolve to a prerelease.
+      - name: Find the newest Node release
+        id: node
+        run: echo "version=$(curl -fsSL https://nodejs.org/dist/index.json | jq -r '[.[] | select(.version | contains("-") | not)][0].version')" >> "$GITHUB_OUTPUT"
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: current
+          node-version: ${{ steps.node.outputs.version }}
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Raise the runtime to the ceiling
-        run: pnpm --filter @goa-typescript/runtime add --save-dev typescript@latest 'zod@^4.1.0'
+        run: |
+          pnpm --filter @goa-typescript/runtime add --save-dev typescript@latest 'zod@^4.1.0'
+          pnpm --filter @goa-typescript/runtime list typescript zod
 
       - name: Raise the toy to the ceiling
         working-directory: examples/toy

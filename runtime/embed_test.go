@@ -2,8 +2,10 @@ package runtime
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -57,22 +59,64 @@ func TestSortedIsOrderedAndComplete(t *testing.T) {
 	}
 }
 
+// moduleSpecifier matches the module a static import or export names
+// (`from '…'`), a side-effect import (`import '…'`) or a dynamic import
+// (`import('…')`), in either quote style.
+var moduleSpecifier = regexp.MustCompile(`(?:\bfrom|\bimport)\s*\(?\s*(['"])([^'"\n]+)(['"])`)
+
+// moduleSpecifiers returns the modules a source file imports, with the line
+// each one is on.
+func moduleSpecifiers(src string) (specs []string, lines []int) {
+	for _, m := range moduleSpecifier.FindAllStringSubmatchIndex(src, -1) {
+		if src[m[2]:m[3]] != src[m[6]:m[7]] {
+			continue
+		}
+		specs = append(specs, src[m[4]:m[5]])
+		lines = append(lines, strings.Count(src[:m[0]], "\n")+1)
+	}
+	return specs, lines
+}
+
+func TestModuleSpecifiers(t *testing.T) {
+	src := `import * as z from 'zod';
+import {
+  a,
+  type B,
+} from "./a.js";
+export * from './b.js';
+export { c } from './c';
+import './side-effect.js';
+const d = await import('node:fs');
+`
+	specs, lines := moduleSpecifiers(src)
+	want := []string{"zod", "./a.js", "./b.js", "./c", "./side-effect.js", "node:fs"}
+	if strings.Join(specs, " ") != strings.Join(want, " ") {
+		t.Errorf("specifiers: got %q, want %q", specs, want)
+	}
+	if wantLines := []int{1, 5, 6, 7, 8, 9}; fmt.Sprint(lines) != fmt.Sprint(wantLines) {
+		t.Errorf("lines: got %v, want %v", lines, wantLines)
+	}
+}
+
 // The generator copies these files next to each other, so they may only
 // import each other (with the .js suffix bundlers expect) and zod.
 func TestSourcesOnlyImportSiblingsAndZod(t *testing.T) {
+	total := 0
 	for _, f := range Sorted() {
-		for n, line := range strings.Split(string(f.Content), "\n") {
-			_, spec, ok := strings.Cut(line, " from \"")
-			if !ok || !(strings.HasPrefix(line, "import ") || strings.HasPrefix(line, "export ") || strings.HasPrefix(line, "} from")) {
-				continue
-			}
-			spec = strings.TrimSuffix(strings.TrimSuffix(strings.TrimSpace(spec), ";"), "\"")
+		specs, lines := moduleSpecifiers(string(f.Content))
+		total += len(specs)
+		for i, spec := range specs {
 			if spec == "zod" {
 				continue
 			}
 			if !strings.HasPrefix(spec, "./") || !strings.HasSuffix(spec, ".js") {
-				t.Errorf("%s:%d: import %q must be \"zod\" or a ./sibling.js", f.Name, n+1, spec)
+				t.Errorf("%s:%d: import %q must be \"zod\" or a ./sibling.js", f.Name, lines[i], spec)
 			}
 		}
+	}
+	// The runtime imports zod and its siblings, so finding nothing means the
+	// matcher no longer recognizes the sources' imports.
+	if total == 0 {
+		t.Error("found no imports in the runtime sources")
 	}
 }
